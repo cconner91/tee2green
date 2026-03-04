@@ -1,30 +1,43 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
-export default function NewMatch() {
+import { gameDefinitions } from "@/domain/gameConfig/definitions";
+import { getGamesForPlayerCount } from "@/domain/gameConfig/filters";
+import { GolfGameDefinition } from "@/domain/gameConfig/types";
+
+export default function NewMatchPage() {
   const router = useRouter();
 
+  // Player Info
   const [playerA, setPlayerA] = useState("");
   const [playerB, setPlayerB] = useState("");
   const [hcpA, setHcpA] = useState("");
   const [hcpB, setHcpB] = useState("");
 
-  const [gameType, setGameType] = useState<
-    "MATCH_PLAY" | "STROKE_PLAY"
-  >("MATCH_PLAY");
+  // Game Config
+  const [playerCount, setPlayerCount] = useState(2);
+  const [availableGames, setAvailableGames] = useState<GolfGameDefinition[]>([]);
+  const [selectedGame, setSelectedGame] = useState<GolfGameDefinition | null>(null);
+  const [enableHandicaps, setEnableHandicaps] = useState(true);
 
-  const [enableHandicaps, setEnableHandicaps] =
-    useState(true);
+  // Filter games based on player count
+  useEffect(() => {
+    const validGames = getGamesForPlayerCount(playerCount, gameDefinitions);
+    setAvailableGames(validGames);
+    setSelectedGame(null); // reset selection if player count changes
+  }, [playerCount]);
 
   const startMatch = () => {
+    if (!selectedGame) return;
+
     const params = new URLSearchParams({
       playerA,
       playerB,
       hcpA,
       hcpB,
-      gameType,
+      gameId: selectedGame.id,
       enableHandicaps: enableHandicaps.toString(),
     });
 
@@ -38,14 +51,57 @@ export default function NewMatch() {
         Start Match
       </h1>
 
+      {/* Number of Players */}
+      <div className="space-y-2">
+        <label className="text-sm text-slate-400">
+          Number of Players
+        </label>
+
+        <select
+          value={playerCount}
+          onChange={(e) => setPlayerCount(Number(e.target.value))}
+          className="w-full p-3 rounded-xl bg-slate-800"
+        >
+          {[1,2,3,4,5,6,7,8].map((num) => (
+            <option key={num} value={num}>
+              {num} Player{num > 1 && "s"}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Available Games */}
+      <div className="space-y-3">
+        <div className="text-sm text-slate-400">
+          Available Games
+        </div>
+
+        {availableGames.map((game) => (
+          <div
+            key={game.id}
+            onClick={() => setSelectedGame(game)}
+            className={`p-4 rounded-xl border cursor-pointer transition ${
+              selectedGame?.id === game.id
+                ? "bg-sky-500 text-black border-sky-400"
+                : "bg-slate-900 border-slate-800 hover:border-sky-400"
+            }`}
+          >
+            <div className="font-semibold">
+              {game.name}
+            </div>
+            <div className="text-xs opacity-70">
+              {game.description}
+            </div>
+          </div>
+        ))}
+      </div>
+
       {/* Handicap Toggle */}
       <div className="flex items-center justify-between bg-slate-900 p-4 rounded-xl">
         <span>Enable Handicaps</span>
 
         <button
-          onClick={() =>
-            setEnableHandicaps(!enableHandicaps)
-          }
+          onClick={() => setEnableHandicaps(!enableHandicaps)}
           className={`w-14 h-7 rounded-full transition relative ${
             enableHandicaps
               ? "bg-sky-500"
@@ -62,62 +118,52 @@ export default function NewMatch() {
         </button>
       </div>
 
-      {/* Game Type */}
-      <div className="flex gap-4">
-        <button
-          onClick={() => setGameType("MATCH_PLAY")}
-          className={`flex-1 py-3 rounded-xl ${
-            gameType === "MATCH_PLAY"
-              ? "bg-sky-500 text-black"
-              : "bg-slate-800"
-          }`}
-        >
-          Match Play
-        </button>
-
-        <button
-          onClick={() => setGameType("STROKE_PLAY")}
-          className={`flex-1 py-3 rounded-xl ${
-            gameType === "STROKE_PLAY"
-              ? "bg-sky-500 text-black"
-              : "bg-slate-800"
-          }`}
-        >
-          Stroke Play
-        </button>
-      </div>
-
       {/* Player Inputs */}
       <input
         placeholder="Player 1 Name"
         className="w-full p-3 rounded-xl bg-slate-800"
+        value={playerA}
         onChange={(e) => setPlayerA(e.target.value)}
       />
 
       <input
         placeholder="Player 1 Handicap (optional)"
         className="w-full p-3 rounded-xl bg-slate-800"
+        value={hcpA}
         onChange={(e) => setHcpA(e.target.value)}
       />
 
-      <input
-        placeholder="Player 2 Name"
-        className="w-full p-3 rounded-xl bg-slate-800"
-        onChange={(e) => setPlayerB(e.target.value)}
-      />
+      {playerCount > 1 && (
+        <>
+          <input
+            placeholder="Player 2 Name"
+            className="w-full p-3 rounded-xl bg-slate-800"
+            value={playerB}
+            onChange={(e) => setPlayerB(e.target.value)}
+          />
 
-      <input
-        placeholder="Player 2 Handicap (optional)"
-        className="w-full p-3 rounded-xl bg-slate-800"
-        onChange={(e) => setHcpB(e.target.value)}
-      />
+          <input
+            placeholder="Player 2 Handicap (optional)"
+            className="w-full p-3 rounded-xl bg-slate-800"
+            value={hcpB}
+            onChange={(e) => setHcpB(e.target.value)}
+          />
+        </>
+      )}
 
+      {/* Start Button */}
       <button
         onClick={startMatch}
-        className="w-full py-4 bg-sky-500 text-black rounded-xl font-semibold"
+        disabled={!selectedGame}
+        className={`w-full py-4 rounded-xl font-semibold transition ${
+          selectedGame
+            ? "bg-sky-500 text-black hover:bg-sky-400"
+            : "bg-slate-700 text-slate-400 cursor-not-allowed"
+        }`}
       >
         Start Match
       </button>
+
     </div>
   );
 }
