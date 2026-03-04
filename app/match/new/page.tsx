@@ -12,18 +12,18 @@ export default function NewMatchPage() {
   const [hcpA, setHcpA] = useState("");
   const [hcpB, setHcpB] = useState("");
 
-  const [selectedGame, setSelectedGame] = useState("match-play-game");
+  const [gameType, setGameType] = useState("match-play-game");
 
   const [enableHandicaps, setEnableHandicaps] = useState(true);
   const [enableBetting, setEnableBetting] = useState(false);
 
   const startMatch = () => {
     const params = new URLSearchParams({
-      playerA: playerAName,
-      playerB: playerBName,
+      playerA: playerAName || "Player 1",
+      playerB: playerBName || "Player 2",
       hcpA: hcpA || "0",
       hcpB: hcpB || "0",
-      gameType: selectedGame,
+      gameType: gameType,
       enableHandicaps: String(enableHandicaps),
       enableBetting: String(enableBetting),
     });
@@ -38,11 +38,11 @@ export default function NewMatchPage() {
         {/* Header */}
         <div className="text-center space-y-2">
           <h1 className="text-3xl font-bold">Start New Match</h1>
-          <p className="text-slate-400">Setup your round</p>
+          <p className="text-slate-400">Set up your round</p>
         </div>
 
         {/* Player 1 */}
-        <div className="bg-slate-800 p-5 rounded-xl space-y-3">
+        <div className="bg-slate-800 rounded-xl p-5 space-y-3">
           <input
             value={playerAName}
             onChange={(e) => setPlayerAName(e.target.value)}
@@ -60,7 +60,7 @@ export default function NewMatchPage() {
         </div>
 
         {/* Player 2 */}
-        <div className="bg-slate-800 p-5 rounded-xl space-y-3">
+        <div className="bg-slate-800 rounded-xl p-5 space-y-3">
           <input
             value={playerBName}
             onChange={(e) => setPlayerBName(e.target.value)}
@@ -78,12 +78,12 @@ export default function NewMatchPage() {
         </div>
 
         {/* Game Type */}
-        <div className="bg-slate-800 p-5 rounded-xl space-y-3">
+        <div className="bg-slate-800 rounded-xl p-5 space-y-3">
           <div className="text-sm text-slate-400">Game Type</div>
 
           <select
-            value={selectedGame}
-            onChange={(e) => setSelectedGame(e.target.value)}
+            value={gameType}
+            onChange={(e) => setGameType(e.target.value)}
             className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2"
           >
             <option value="match-play-game">Match Play Game</option>
@@ -92,9 +92,9 @@ export default function NewMatchPage() {
         </div>
 
         {/* Options */}
-        <div className="bg-slate-800 p-5 rounded-xl space-y-4">
+        <div className="bg-slate-800 rounded-xl p-5 space-y-4">
 
-          <label className="flex items-center justify-between">
+          <label className="flex justify-between items-center">
             <span>Enable Handicaps</span>
             <input
               type="checkbox"
@@ -103,7 +103,7 @@ export default function NewMatchPage() {
             />
           </label>
 
-          <label className="flex items-center justify-between">
+          <label className="flex justify-between items-center">
             <span>Enable Match Betting</span>
             <input
               type="checkbox"
@@ -117,7 +117,7 @@ export default function NewMatchPage() {
         {/* Start Match Button */}
         <button
           onClick={startMatch}
-          className="w-full py-4 rounded-xl bg-sky-400 text-black font-bold text-lg hover:bg-sky-300"
+          className="w-full py-4 rounded-xl bg-sky-400 text-black font-bold text-lg hover:bg-sky-300 transition"
         >
           Start Match
         </button>

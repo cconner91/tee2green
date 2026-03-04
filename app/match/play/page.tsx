@@ -5,7 +5,7 @@ import PlayMatch from "./playMatch";
 
 export default function Page() {
   return (
-    <Suspense fallback={<div className="p-10">Loading match...</div>}>
+    <Suspense fallback={<div className="p-6">Loading match...</div>}>
       <PlayMatch />
     </Suspense>
   );
