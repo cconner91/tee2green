@@ -1,55 +1,43 @@
 import { HoleResult } from "../core/HoleResult";
-import { PlayerId } from "../models/Player";
-
-export interface NassauResult {
-  frontWinner: PlayerId | "TIE";
-  backWinner: PlayerId | "TIE";
-  overallWinner: PlayerId | "TIE";
-}
 
 export function evaluateNassau(
   holeResults: HoleResult[]
-): NassauResult {
+) {
+  const front = holeResults.slice(0, 9);
+  const back = holeResults.slice(9, 18);
 
-  const frontWins: Record<PlayerId, number> = {};
-  const backWins: Record<PlayerId, number> = {};
-  const totalWins: Record<PlayerId, number> = {};
+  const evaluateNine = (
+    holes: HoleResult[]
+  ): string => {
+    const wins: Record<string, number> = {};
 
-  for (const result of holeResults) {
-    if (result.winner === "TIE") continue;
+    holes.forEach((hole) => {
+      if (hole.winner !== "TIE") {
+        wins[hole.winner] =
+          (wins[hole.winner] || 0) + 1;
+      }
+    });
 
-    const playerId = result.winner;
+    const players = Object.keys(wins);
 
-    frontWins[playerId] = frontWins[playerId] ?? 0;
-    backWins[playerId] = backWins[playerId] ?? 0;
-    totalWins[playerId] = totalWins[playerId] ?? 0;
+    if (players.length === 0) return "TIE";
 
-    totalWins[playerId]++;
+    const [playerA, playerB] = players;
 
-    if (result.holeNumber <= 9) {
-      frontWins[playerId]++;
-    } else {
-      backWins[playerId]++;
-    }
-  }
+    if (!playerB) return playerA;
 
-  function determineWinner(record: Record<PlayerId, number>): PlayerId | "TIE" {
-    const entries = Object.entries(record);
+    if (wins[playerA] > wins[playerB])
+      return playerA;
 
-    if (entries.length === 0) return "TIE";
+    if (wins[playerB] > wins[playerA])
+      return playerB;
 
-    entries.sort((a, b) => b[1] - a[1]);
-
-    if (entries.length > 1 && entries[0][1] === entries[1][1]) {
-      return "TIE";
-    }
-
-    return entries[0][0];
-  }
+    return "TIE";
+  };
 
   return {
-    frontWinner: determineWinner(frontWins),
-    backWinner: determineWinner(backWins),
-    overallWinner: determineWinner(totalWins),
+    frontWinner: evaluateNine(front),
+    backWinner: evaluateNine(back),
+    overallWinner: evaluateNine(holeResults),
   };
 }
