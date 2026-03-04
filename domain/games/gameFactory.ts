@@ -1,20 +1,16 @@
 import { GameEngine } from "./types";
 import { StrokePlayEngine } from "./strokePlayEngine";
 import { MatchPlayEngine } from "./matchPlayEngine";
-import { NassauEngine } from "./nassau";
 
 export function createGameEngine(
   gameId: string
 ): GameEngine {
   switch (gameId) {
-    case "stroke-play":
+    case "stroke-play-game":
       return new StrokePlayEngine();
 
-    case "match-play":
+    case "match-play-game":
       return new MatchPlayEngine();
-
-    case "nassau":
-      return new NassauEngine();
 
     default:
       throw new Error(
