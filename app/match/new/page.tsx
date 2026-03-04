@@ -1,14 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export default function NewMatchPage() {
-  const router = useRouter();
-
   const [playerAName, setPlayerAName] = useState("");
   const [playerBName, setPlayerBName] = useState("");
-
   const [hcpA, setHcpA] = useState("");
   const [hcpB, setHcpB] = useState("");
 
@@ -17,25 +14,20 @@ export default function NewMatchPage() {
   const [enableHandicaps, setEnableHandicaps] = useState(true);
   const [enableBetting, setEnableBetting] = useState(false);
 
-  const startMatch = () => {
-    const params = new URLSearchParams({
-      playerA: playerAName || "Player 1",
-      playerB: playerBName || "Player 2",
-      hcpA: hcpA || "0",
-      hcpB: hcpB || "0",
-      gameType: gameType,
-      enableHandicaps: String(enableHandicaps),
-      enableBetting: String(enableBetting),
-    });
-
-    router.push(`/match/play?${params.toString()}`);
-  };
+  const params = new URLSearchParams({
+    playerA: playerAName || "Player 1",
+    playerB: playerBName || "Player 2",
+    hcpA: hcpA || "0",
+    hcpB: hcpB || "0",
+    gameType,
+    enableHandicaps: String(enableHandicaps),
+    enableBetting: String(enableBetting),
+  });
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 flex justify-center px-4">
       <div className="w-full max-w-md py-10 space-y-8">
 
-        {/* Header */}
         <div className="text-center space-y-2">
           <h1 className="text-3xl font-bold">Start New Match</h1>
           <p className="text-slate-400">Set up your round</p>
@@ -114,13 +106,12 @@ export default function NewMatchPage() {
 
         </div>
 
-        {/* Start Match Button */}
-        <button
-          onClick={startMatch}
-          className="w-full py-4 rounded-xl bg-sky-400 text-black font-bold text-lg hover:bg-sky-300 transition"
-        >
-          Start Match
-        </button>
+        {/* Start Match */}
+        <Link href={`/match/play?${params.toString()}`}>
+          <div className="w-full py-4 rounded-xl bg-sky-400 text-black font-bold text-lg hover:bg-sky-300 transition text-center cursor-pointer">
+            Start Match
+          </div>
+        </Link>
 
       </div>
     </div>

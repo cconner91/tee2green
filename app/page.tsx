@@ -80,7 +80,7 @@ export default function Home() {
                 Current Balance
               </span>
               <span className="text-sky-400 font-semibold">
-                +$245
+                $$$
               </span>
             </div>
 
