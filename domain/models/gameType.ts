@@ -1,0 +1,1 @@
+export type GameType = "MATCH_PLAY" | "STROKE_PLAY";
