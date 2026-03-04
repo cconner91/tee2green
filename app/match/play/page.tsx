@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense } from "react";
-import PlayMatch from "./PlayMatch";
+import PlayMatch from "./playMatch";
 
 export default function Page() {
   return (

@@ -5,32 +5,39 @@ import { useRouter } from "next/navigation";
 
 import { gameDefinitions } from "@/domain/gameConfig/definitions";
 import { getGamesForPlayerCount } from "@/domain/gameConfig/filters";
+import { validatePresetGame } from "@/domain/gameConfig/validateGameConfiguration";
 import { GolfGameDefinition } from "@/domain/gameConfig/types";
 
 export default function NewMatchPage() {
   const router = useRouter();
 
-  // Player Info
+  const [playerCount, setPlayerCount] = useState(2);
+  const [availableGames, setAvailableGames] = useState<GolfGameDefinition[]>([]);
+  const [selectedGame, setSelectedGame] = useState<GolfGameDefinition | null>(null);
+
   const [playerA, setPlayerA] = useState("");
   const [playerB, setPlayerB] = useState("");
   const [hcpA, setHcpA] = useState("");
   const [hcpB, setHcpB] = useState("");
 
-  // Game Config
-  const [playerCount, setPlayerCount] = useState(2);
-  const [availableGames, setAvailableGames] = useState<GolfGameDefinition[]>([]);
-  const [selectedGame, setSelectedGame] = useState<GolfGameDefinition | null>(null);
   const [enableHandicaps, setEnableHandicaps] = useState(true);
+  const [enableBetting, setEnableBetting] = useState(false);
+  const [betAmount, setBetAmount] = useState("");
 
-  // Filter games based on player count
   useEffect(() => {
-    const validGames = getGamesForPlayerCount(playerCount, gameDefinitions);
-    setAvailableGames(validGames);
-    setSelectedGame(null); // reset selection if player count changes
+    const filtered = getGamesForPlayerCount(playerCount, gameDefinitions);
+    setAvailableGames(filtered);
+    setSelectedGame(null);
   }, [playerCount]);
 
   const startMatch = () => {
     if (!selectedGame) return;
+
+    const validation = validatePresetGame(selectedGame, playerCount);
+    if (!validation.valid) {
+      alert(validation.reason);
+      return;
+    }
 
     const params = new URLSearchParams({
       playerA,
@@ -39,42 +46,37 @@ export default function NewMatchPage() {
       hcpB,
       gameId: selectedGame.id,
       enableHandicaps: enableHandicaps.toString(),
+      enableBetting: enableBetting.toString(),
+      betAmount,
     });
 
     router.push(`/match/play?${params.toString()}`);
   };
 
   return (
-    <div className="min-h-screen px-6 py-16 max-w-md mx-auto space-y-10">
+    <div className="min-h-screen px-6 py-12 max-w-md mx-auto space-y-8">
 
-      <h1 className="text-2xl font-bold text-center">
-        Start Match
-      </h1>
+      <h1 className="text-2xl font-bold text-center">New Match</h1>
 
-      {/* Number of Players */}
+      {/* Player Count */}
       <div className="space-y-2">
-        <label className="text-sm text-slate-400">
-          Number of Players
-        </label>
-
+        <label className="text-sm text-slate-400">Players</label>
         <select
           value={playerCount}
           onChange={(e) => setPlayerCount(Number(e.target.value))}
           className="w-full p-3 rounded-xl bg-slate-800"
         >
-          {[1,2,3,4,5,6,7,8].map((num) => (
-            <option key={num} value={num}>
-              {num} Player{num > 1 && "s"}
+          {[2,3,4,5,6,7,8].map((n) => (
+            <option key={n} value={n}>
+              {n} Players
             </option>
           ))}
         </select>
       </div>
 
-      {/* Available Games */}
+      {/* Game Selection */}
       <div className="space-y-3">
-        <div className="text-sm text-slate-400">
-          Available Games
-        </div>
+        <div className="text-sm text-slate-400">Game Type</div>
 
         {availableGames.map((game) => (
           <div
@@ -86,37 +88,54 @@ export default function NewMatchPage() {
                 : "bg-slate-900 border-slate-800 hover:border-sky-400"
             }`}
           >
-            <div className="font-semibold">
-              {game.name}
-            </div>
-            <div className="text-xs opacity-70">
-              {game.description}
-            </div>
+            <div className="font-semibold">{game.name}</div>
+            <div className="text-xs opacity-70">{game.description}</div>
           </div>
         ))}
       </div>
 
-      {/* Handicap Toggle */}
-      <div className="flex items-center justify-between bg-slate-900 p-4 rounded-xl">
+      {/* Toggles */}
+      <div className="flex justify-between bg-slate-900 p-4 rounded-xl">
         <span>Enable Handicaps</span>
-
         <button
           onClick={() => setEnableHandicaps(!enableHandicaps)}
-          className={`w-14 h-7 rounded-full transition relative ${
-            enableHandicaps
-              ? "bg-sky-500"
-              : "bg-slate-600"
+          className={`w-14 h-7 rounded-full relative transition ${
+            enableHandicaps ? "bg-sky-500" : "bg-slate-600"
           }`}
         >
           <div
             className={`absolute top-1 left-1 w-5 h-5 bg-white rounded-full transition ${
-              enableHandicaps
-                ? "translate-x-7"
-                : ""
+              enableHandicaps ? "translate-x-7" : ""
             }`}
           />
         </button>
       </div>
+
+      <div className="flex justify-between bg-slate-900 p-4 rounded-xl">
+        <span>Enable Match Betting</span>
+        <button
+          onClick={() => setEnableBetting(!enableBetting)}
+          className={`w-14 h-7 rounded-full relative transition ${
+            enableBetting ? "bg-sky-500" : "bg-slate-600"
+          }`}
+        >
+          <div
+            className={`absolute top-1 left-1 w-5 h-5 bg-white rounded-full transition ${
+              enableBetting ? "translate-x-7" : ""
+            }`}
+          />
+        </button>
+      </div>
+
+      {enableBetting && (
+        <input
+          type="number"
+          placeholder="Base Bet Amount ($)"
+          value={betAmount}
+          onChange={(e) => setBetAmount(e.target.value)}
+          className="w-full p-3 rounded-xl bg-slate-800"
+        />
+      )}
 
       {/* Player Inputs */}
       <input
@@ -127,43 +146,37 @@ export default function NewMatchPage() {
       />
 
       <input
-        placeholder="Player 1 Handicap (optional)"
+        placeholder="Player 1 Handicap"
         className="w-full p-3 rounded-xl bg-slate-800"
         value={hcpA}
         onChange={(e) => setHcpA(e.target.value)}
       />
 
-      {playerCount > 1 && (
-        <>
-          <input
-            placeholder="Player 2 Name"
-            className="w-full p-3 rounded-xl bg-slate-800"
-            value={playerB}
-            onChange={(e) => setPlayerB(e.target.value)}
-          />
+      <input
+        placeholder="Player 2 Name"
+        className="w-full p-3 rounded-xl bg-slate-800"
+        value={playerB}
+        onChange={(e) => setPlayerB(e.target.value)}
+      />
 
-          <input
-            placeholder="Player 2 Handicap (optional)"
-            className="w-full p-3 rounded-xl bg-slate-800"
-            value={hcpB}
-            onChange={(e) => setHcpB(e.target.value)}
-          />
-        </>
-      )}
+      <input
+        placeholder="Player 2 Handicap"
+        className="w-full p-3 rounded-xl bg-slate-800"
+        value={hcpB}
+        onChange={(e) => setHcpB(e.target.value)}
+      />
 
-      {/* Start Button */}
       <button
         onClick={startMatch}
         disabled={!selectedGame}
-        className={`w-full py-4 rounded-xl font-semibold transition ${
+        className={`w-full py-4 rounded-xl font-semibold ${
           selectedGame
-            ? "bg-sky-500 text-black hover:bg-sky-400"
-            : "bg-slate-700 text-slate-400 cursor-not-allowed"
+            ? "bg-sky-500 text-black"
+            : "bg-slate-700 text-slate-400"
         }`}
       >
         Start Match
       </button>
-
     </div>
   );
 }

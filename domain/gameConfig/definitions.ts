@@ -7,52 +7,78 @@ import {
 
 export const gameDefinitions: GolfGameDefinition[] = [
   {
-    id: "stroke-play",
-    name: "Stroke Play",
+    id: "stroke-play-game",
+    name: "Stroke Play Game",
     description:
-      "Traditional golf scoring. Lowest total strokes wins.",
-    minPlayers: 1,
+      "Lowest total strokes over 18 holes wins.",
+
+    scoringFormat: ScoringFormat.StrokePlay,
+    gameplayFormat: GameplayFormat.Individual,
+    matchupFormat: MatchupFormat.H2H,
+
+    minPlayers: 2,
     maxPlayers: 8,
-    scoringFormats: [ScoringFormat.StrokePlay],
-    gameplayFormats: [GameplayFormat.Individual],
-    matchupFormats: [
-      MatchupFormat.Solo,
-      MatchupFormat.H2H,
-      MatchupFormat.TeamPlay,
-    ],
+
     bettingEnabled: true,
     handicapEnabled: true,
-    tags: ["Classic"],
+
+    tags: ["Classic", "Total Score"],
   },
+
   {
-    id: "match-play",
-    name: "Match Play",
+    id: "match-play-game",
+    name: "Match Play Game",
     description:
-      "Hole-by-hole competition. Most holes won wins.",
+      "Hole-by-hole competition. Most holes won wins the match.",
+
+    scoringFormat: ScoringFormat.MatchPlay,
+    gameplayFormat: GameplayFormat.Individual,
+    matchupFormat: MatchupFormat.H2H,
+
     minPlayers: 2,
     maxPlayers: 4,
-    scoringFormats: [ScoringFormat.MatchPlay],
-    gameplayFormats: [GameplayFormat.Individual],
-    matchupFormats: [MatchupFormat.H2H],
+
     bettingEnabled: true,
     handicapEnabled: true,
-    tags: ["Classic"],
+
+    tags: ["Classic", "Head to Head"],
   },
+
   {
-    id: "nassau",
-    name: "Nassau",
+    id: "team-best-ball",
+    name: "Team Best Ball",
     description:
-      "Front 9, Back 9, Overall match.",
-    minPlayers: 2,
-    maxPlayers: 4,
-    scoringFormats: [
-      ScoringFormat.MatchPlay,
-      ScoringFormat.StrokePlay,
-    ],
-    gameplayFormats: [GameplayFormat.Individual],
-    matchupFormats: [MatchupFormat.H2H],
+      "Teams of 2. Each player plays their own ball. Lowest score per team counts.",
+
+    scoringFormat: ScoringFormat.StrokePlay,
+    gameplayFormat: GameplayFormat.BestBall,
+    matchupFormat: MatchupFormat.TeamPlay,
+
+    minPlayers: 4,
+    maxPlayers: 8,
+
     bettingEnabled: true,
     handicapEnabled: true,
-    tags: ["Betting"],
+
+    tags: ["Team", "Best Ball"],
+  },
+
+  {
+    id: "scramble-game",
+    name: "Scramble",
+    description:
+      "All players tee off. Best shot selected. All play from that position.",
+
+    scoringFormat: ScoringFormat.StrokePlay,
+    gameplayFormat: GameplayFormat.Scramble,
+    matchupFormat: MatchupFormat.TeamPlay,
+
+    minPlayers: 4,
+    maxPlayers: 8,
+
+    bettingEnabled: true,
+    handicapEnabled: true,
+
+    tags: ["Team", "Scramble"],
   },
 ];

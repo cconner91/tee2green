@@ -15,8 +15,14 @@ export enum GameplayFormat {
 export enum MatchupFormat {
   Solo = "Solo",
   H2H = "H2H",
-  H2HModified = "H2HModified",
   TeamPlay = "TeamPlay",
+}
+
+export interface GameConfiguration {
+  scoringFormat: ScoringFormat;
+  gameplayFormat: GameplayFormat;
+  matchupFormat: MatchupFormat;
+  playerCount: number;
 }
 
 export interface GolfGameDefinition {
@@ -24,12 +30,12 @@ export interface GolfGameDefinition {
   name: string;
   description: string;
 
+  scoringFormat: ScoringFormat;
+  gameplayFormat: GameplayFormat;
+  matchupFormat: MatchupFormat;
+
   minPlayers: number;
   maxPlayers: number;
-
-  scoringFormats: ScoringFormat[];
-  gameplayFormats: GameplayFormat[];
-  matchupFormats: MatchupFormat[];
 
   bettingEnabled: boolean;
   handicapEnabled: boolean;

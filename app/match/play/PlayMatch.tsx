@@ -1,179 +1,182 @@
 "use client";
 
-import { useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
-import { mockCourse } from "@/data/mockCourse";
-import {
-  calculateCourseHandicap,
-  calculatePlayingHandicap,
-} from "@/domain/core/handicap";
+import { gameDefinitions } from "@/domain/gameConfig/definitions";
+import { getGamesForPlayerCount } from "@/domain/gameConfig/filters";
+import { validatePresetGame } from "@/domain/gameConfig/validateGameConfiguration";
+import { GolfGameDefinition } from "@/domain/gameConfig/types";
 
-import { playHole } from "@/state/matchEngine";
-import { MatchState } from "@/state/matchState";
+export default function NewMatchPage() {
+  const router = useRouter();
 
-import { createGameEngine } from "@/domain/games/gameFactory";
+  const [playerCount, setPlayerCount] = useState(2);
+  const [availableGames, setAvailableGames] = useState<GolfGameDefinition[]>([]);
+  const [selectedGame, setSelectedGame] = useState<GolfGameDefinition | null>(null);
 
-export default function PlayMatch() {
-  const searchParams = useSearchParams();
+  const [playerA, setPlayerA] = useState("");
+  const [playerB, setPlayerB] = useState("");
+  const [hcpA, setHcpA] = useState("");
+  const [hcpB, setHcpB] = useState("");
 
-  // --- URL PARAMS ---
-  const playerAName = searchParams.get("playerA") || "Player 1";
-  const playerBName = searchParams.get("playerB") || "Player 2";
-  const rawHcpA = searchParams.get("hcpA");
-  const rawHcpB = searchParams.get("hcpB");
-  const gameId = searchParams.get("gameId") || "match-play";
-  const enableHandicaps =
-    searchParams.get("enableHandicaps") === "true";
+  const [enableHandicaps, setEnableHandicaps] = useState(true);
+  const [enableBetting, setEnableBetting] = useState(false);
+  const [betAmount, setBetAmount] = useState("");
 
-  const hcpA = rawHcpA ? Number(rawHcpA) : 0;
-  const hcpB = rawHcpB ? Number(rawHcpB) : 0;
+  useEffect(() => {
+    const filtered = getGamesForPlayerCount(playerCount, gameDefinitions);
+    setAvailableGames(filtered);
+    setSelectedGame(null);
+  }, [playerCount]);
 
-  // --- PLAYERS ---
-  const playerA = {
-    id: "playerA",
-    name: playerAName,
-    handicapIndex: hcpA,
-  };
+  const startMatch = () => {
+    if (!selectedGame) return;
 
-  const playerB = {
-    id: "playerB",
-    name: playerBName,
-    handicapIndex: hcpB,
-  };
+    const validation = validatePresetGame(selectedGame, playerCount);
+    if (!validation.valid) {
+      alert(validation.reason);
+      return;
+    }
 
-  // --- HANDICAPS ---
-  const courseHcpA = calculateCourseHandicap(
-    playerA.handicapIndex,
-    mockCourse.slopeRating,
-    mockCourse.courseRating,
-    mockCourse.par
-  );
-
-  const courseHcpB = calculateCourseHandicap(
-    playerB.handicapIndex,
-    mockCourse.slopeRating,
-    mockCourse.courseRating,
-    mockCourse.par
-  );
-
-  const initialState: MatchState = {
-    players: [playerA, playerB],
-    course: mockCourse,
-    playingHandicaps: {
-      [playerA.id]: calculatePlayingHandicap(courseHcpA),
-      [playerB.id]: calculatePlayingHandicap(courseHcpB),
-    },
-    holeResults: [],
-    currentHole: 1,
-    gameType: gameId as any,
-    enableHandicaps,
-  };
-
-  const [matchState, setMatchState] =
-    useState<MatchState>(initialState);
-
-  const [grossA, setGrossA] = useState("");
-  const [grossB, setGrossB] = useState("");
-
-  // --- GAME ENGINE ---
-  const engine = createGameEngine(gameId);
-  const gameResult = engine.evaluate(
-    matchState.holeResults
-  );
-
-  // --- SUBMIT HOLE ---
-  const handleSubmit = () => {
-    if (!grossA || !grossB) return;
-
-    const updatedState = playHole(matchState, {
-      playerA: Number(grossA),
-      playerB: Number(grossB),
+    const params = new URLSearchParams({
+      playerA,
+      playerB,
+      hcpA,
+      hcpB,
+      gameId: selectedGame.id,
+      enableHandicaps: enableHandicaps.toString(),
+      enableBetting: enableBetting.toString(),
+      betAmount,
     });
 
-    setMatchState(updatedState);
-    setGrossA("");
-    setGrossB("");
+    router.push(`/match/play?${params.toString()}`);
   };
 
-  // --- UI HELPERS ---
-  const currentHole = matchState.currentHole;
-
   return (
-    <div className="min-h-screen px-6 py-10 max-w-md mx-auto space-y-8">
+    <div className="min-h-screen px-6 py-12 max-w-md mx-auto space-y-8">
 
-      <div className="text-center space-y-1">
-        <h1 className="text-2xl font-bold">
-          {gameId.replace("-", " ").toUpperCase()}
-        </h1>
-        <p className="text-slate-400">
-          Hole {currentHole}
-        </p>
+      <h1 className="text-2xl font-bold text-center">New Match</h1>
+
+      {/* Player Count */}
+      <div className="space-y-2">
+        <label className="text-sm text-slate-400">Players</label>
+        <select
+          value={playerCount}
+          onChange={(e) => setPlayerCount(Number(e.target.value))}
+          className="w-full p-3 rounded-xl bg-slate-800"
+        >
+          {[2,3,4,5,6,7,8].map((n) => (
+            <option key={n} value={n}>
+              {n} Players
+            </option>
+          ))}
+        </select>
       </div>
 
-      {/* Player A */}
-      <div className="bg-slate-900 p-5 rounded-2xl space-y-3">
-        <div className="flex justify-between">
-          <span className="font-semibold">
-            {playerA.name}
-          </span>
-          <span className="text-sm text-slate-400">
-            HCP {matchState.playingHandicaps[playerA.id]}
-          </span>
-        </div>
+      {/* Game Selection */}
+      <div className="space-y-3">
+        <div className="text-sm text-slate-400">Game Type</div>
 
+        {availableGames.map((game) => (
+          <div
+            key={game.id}
+            onClick={() => setSelectedGame(game)}
+            className={`p-4 rounded-xl border cursor-pointer transition ${
+              selectedGame?.id === game.id
+                ? "bg-sky-500 text-black border-sky-400"
+                : "bg-slate-900 border-slate-800 hover:border-sky-400"
+            }`}
+          >
+            <div className="font-semibold">{game.name}</div>
+            <div className="text-xs opacity-70">{game.description}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Toggles */}
+      <div className="flex justify-between bg-slate-900 p-4 rounded-xl">
+        <span>Enable Handicaps</span>
+        <button
+          onClick={() => setEnableHandicaps(!enableHandicaps)}
+          className={`w-14 h-7 rounded-full relative transition ${
+            enableHandicaps ? "bg-sky-500" : "bg-slate-600"
+          }`}
+        >
+          <div
+            className={`absolute top-1 left-1 w-5 h-5 bg-white rounded-full transition ${
+              enableHandicaps ? "translate-x-7" : ""
+            }`}
+          />
+        </button>
+      </div>
+
+      <div className="flex justify-between bg-slate-900 p-4 rounded-xl">
+        <span>Enable Match Betting</span>
+        <button
+          onClick={() => setEnableBetting(!enableBetting)}
+          className={`w-14 h-7 rounded-full relative transition ${
+            enableBetting ? "bg-sky-500" : "bg-slate-600"
+          }`}
+        >
+          <div
+            className={`absolute top-1 left-1 w-5 h-5 bg-white rounded-full transition ${
+              enableBetting ? "translate-x-7" : ""
+            }`}
+          />
+        </button>
+      </div>
+
+      {enableBetting && (
         <input
           type="number"
-          value={grossA}
-          onChange={(e) =>
-            setGrossA(e.target.value)
-          }
-          placeholder="-"
-          className="w-full text-center text-3xl bg-slate-800 rounded-xl py-4"
+          placeholder="Base Bet Amount ($)"
+          value={betAmount}
+          onChange={(e) => setBetAmount(e.target.value)}
+          className="w-full p-3 rounded-xl bg-slate-800"
         />
-      </div>
+      )}
 
-      {/* Player B */}
-      <div className="bg-slate-900 p-5 rounded-2xl space-y-3">
-        <div className="flex justify-between">
-          <span className="font-semibold">
-            {playerB.name}
-          </span>
-          <span className="text-sm text-slate-400">
-            HCP {matchState.playingHandicaps[playerB.id]}
-          </span>
-        </div>
+      {/* Player Inputs */}
+      <input
+        placeholder="Player 1 Name"
+        className="w-full p-3 rounded-xl bg-slate-800"
+        value={playerA}
+        onChange={(e) => setPlayerA(e.target.value)}
+      />
 
-        <input
-          type="number"
-          value={grossB}
-          onChange={(e) =>
-            setGrossB(e.target.value)
-          }
-          placeholder="-"
-          className="w-full text-center text-3xl bg-slate-800 rounded-xl py-4"
-        />
-      </div>
+      <input
+        placeholder="Player 1 Handicap"
+        className="w-full p-3 rounded-xl bg-slate-800"
+        value={hcpA}
+        onChange={(e) => setHcpA(e.target.value)}
+      />
 
-      {/* Submit */}
+      <input
+        placeholder="Player 2 Name"
+        className="w-full p-3 rounded-xl bg-slate-800"
+        value={playerB}
+        onChange={(e) => setPlayerB(e.target.value)}
+      />
+
+      <input
+        placeholder="Player 2 Handicap"
+        className="w-full p-3 rounded-xl bg-slate-800"
+        value={hcpB}
+        onChange={(e) => setHcpB(e.target.value)}
+      />
+
       <button
-        onClick={handleSubmit}
-        className="w-full py-4 rounded-2xl font-bold bg-sky-500 text-black hover:bg-sky-400 transition"
+        onClick={startMatch}
+        disabled={!selectedGame}
+        className={`w-full py-4 rounded-xl font-semibold ${
+          selectedGame
+            ? "bg-sky-500 text-black"
+            : "bg-slate-700 text-slate-400"
+        }`}
       >
-        Submit Hole {currentHole} Score
+        Start Match
       </button>
-
-      {/* Engine Result Display */}
-      <div className="bg-slate-900 p-5 rounded-2xl space-y-3">
-        <div className="font-semibold text-sky-400">
-          Game Result
-        </div>
-
-        <pre className="text-xs text-slate-400 overflow-x-auto">
-          {JSON.stringify(gameResult, null, 2)}
-        </pre>
-      </div>
-
     </div>
   );
 }
