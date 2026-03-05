@@ -11,13 +11,11 @@ export default function PlayMatch() {
   const playerA = params.get("playerA") || "Player 1";
   const playerB = params.get("playerB") || "Player 2";
 
+  const gameType =
+    (params.get("gameType") as "STROKE_PLAY" | "MATCH_PLAY") || "STROKE_PLAY";
+
   const enableBetting = params.get("enableBetting") === "true";
   const betAmount = Number(params.get("betAmount") || 0);
-
-  const [gameType, setGameType] =
-    useState<"STROKE_PLAY" | "MATCH_PLAY">(
-      (params.get("gameType") as any) || "STROKE_PLAY"
-    );
 
   const [hole, setHole] = useState(1);
   const [par, setPar] = useState(4);
@@ -101,9 +99,14 @@ export default function PlayMatch() {
           <button
             key={n}
             onClick={()=>setScore(n)}
-            className={`w-14 h-14 flex items-center justify-center text-lg font-semibold bg-slate-800 transition
+            className={`w-14 h-14 flex items-center justify-center text-lg font-semibold transition
+            bg-slate-800
             ${getShape(n)}
-            ${selected===n ? "bg-sky-500 text-black scale-110":""}`}
+            ${
+              selected===n
+              ? "bg-green-500/30 border-green-400"
+              : ""
+            }`}
           >
             {n}
           </button>
@@ -133,7 +136,7 @@ export default function PlayMatch() {
             return(
               <div
                 key={h}
-                className={`${hole===h?"text-sky-400 font-bold":""}`}
+                className={`${hole===h?"text-green-400 font-bold":""}`}
               >
                 {h}
               </div>
@@ -195,39 +198,21 @@ export default function PlayMatch() {
 
   }
 
+  const leaderA =
+    gameType==="STROKE_PLAY"
+      ? toParA<toParB
+      : holeWinsA>holeWinsB;
+
+  const leaderB =
+    gameType==="STROKE_PLAY"
+      ? toParB<toParA
+      : holeWinsB>holeWinsA;
+
   return(
 
     <div className="min-h-screen bg-slate-900 text-slate-100 flex justify-center px-4">
 
       <div className="w-full max-w-md py-8 space-y-6">
-
-        {/* GAME TYPE */}
-
-        <div className="flex gap-3 justify-center">
-
-          <button
-            onClick={()=>setGameType("STROKE_PLAY")}
-            className={`px-4 py-2 rounded-lg ${
-              gameType==="STROKE_PLAY"
-                ?"bg-sky-400 text-black"
-                :"bg-slate-800"
-            }`}
-          >
-            Stroke Play
-          </button>
-
-          <button
-            onClick={()=>setGameType("MATCH_PLAY")}
-            className={`px-4 py-2 rounded-lg ${
-              gameType==="MATCH_PLAY"
-                ?"bg-sky-400 text-black"
-                :"bg-slate-800"
-            }`}
-          >
-            Match Play
-          </button>
-
-        </div>
 
         <ScorecardStrip/>
 
@@ -238,7 +223,7 @@ export default function PlayMatch() {
           </h1>
 
           {gameType==="MATCH_PLAY" && (
-            <div className="text-sky-400">
+            <div className="text-green-400">
               {matchStatus}
             </div>
           )}
@@ -256,7 +241,7 @@ export default function PlayMatch() {
               onClick={()=>setPar(p)}
               className={`px-4 py-2 rounded-lg ${
                 par===p
-                  ?"bg-sky-400 text-black"
+                  ?"bg-green-500 text-black"
                   :"bg-slate-800"
               }`}
             >
@@ -271,21 +256,21 @@ export default function PlayMatch() {
 
         <div
           className={`bg-slate-800 p-5 rounded-xl ${
-            gameType==="STROKE_PLAY" && toParA<toParB
-              ?"border border-sky-400"
+            leaderA
+              ?"border border-green-400"
               :""
           }`}
         >
 
-          <div className="flex justify-between">
+          <div className="flex justify-between items-center">
 
             <div className="font-semibold">
               {playerA}
             </div>
 
-            {gameType==="STROKE_PLAY" && (
-              <div>{formatScore(toParA)}</div>
-            )}
+            <div className="text-2xl font-bold text-green-400">
+              {formatScore(toParA)}
+            </div>
 
           </div>
 
@@ -300,21 +285,21 @@ export default function PlayMatch() {
 
         <div
           className={`bg-slate-800 p-5 rounded-xl ${
-            gameType==="STROKE_PLAY" && toParB<toParA
-              ?"border border-sky-400"
+            leaderB
+              ?"border border-green-400"
               :""
           }`}
         >
 
-          <div className="flex justify-between">
+          <div className="flex justify-between items-center">
 
             <div className="font-semibold">
               {playerB}
             </div>
 
-            {gameType==="STROKE_PLAY" && (
-              <div>{formatScore(toParB)}</div>
-            )}
+            <div className="text-2xl font-bold text-green-400">
+              {formatScore(toParB)}
+            </div>
 
           </div>
 
@@ -325,16 +310,16 @@ export default function PlayMatch() {
 
         </div>
 
-        {/* SUBMIT BUTTON */}
+        {/* SUBMIT */}
 
         <button
           onClick={submitHole}
-          className="w-full py-4 rounded-xl bg-sky-400 text-black font-bold text-lg"
+          className="w-full py-4 rounded-xl bg-green-500 text-black font-bold text-lg"
         >
           Submit Hole {hole} Score
         </button>
 
-        {/* LIVE BETTING */}
+        {/* BETTING */}
 
         {enableBetting && (
 
@@ -357,15 +342,10 @@ export default function PlayMatch() {
                 Match: {matchStatus}
               </div>
             )}
-
           </div>
-
         )}
-
       </div>
-
     </div>
-
   )
 
 }
