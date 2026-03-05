@@ -63,7 +63,7 @@ export default function PlayMatch() {
     setHole(hole+1);
   }
 
-  function getShape(score:number){
+  function getScoreShape(score:number){
 
     const diff = score-par;
 
@@ -94,24 +94,28 @@ export default function PlayMatch() {
 
       <div className="grid grid-cols-5 gap-2 mt-3">
 
-        {[1,2,3,4,5,6,7,8,9,10].map(n=>(
+        {[1,2,3,4,5,6,7,8,9,10].map(n=>{
 
-          <button
-            key={n}
-            onClick={()=>setScore(n)}
-            className={`w-14 h-14 flex items-center justify-center text-lg font-semibold transition
-            bg-slate-800
-            ${getShape(n)}
-            ${
-              selected===n
-              ? "bg-green-500/30 border-green-400"
-              : ""
-            }`}
-          >
-            {n}
-          </button>
+          const isSelected = selected === n;
 
-        ))}
+          return(
+
+            <button
+              key={n}
+              onClick={()=>setScore(n)}
+              className={`w-14 h-14 flex items-center justify-center text-lg font-semibold transition
+              ${getScoreShape(n)}
+              ${isSelected
+                ? "bg-green-500/30 border-2 border-green-400 scale-110"
+                : "bg-slate-800"
+              }`}
+            >
+              {n}
+            </button>
+
+          )
+
+        })}
 
       </div>
 
@@ -230,8 +234,6 @@ export default function PlayMatch() {
 
         </div>
 
-        {/* PAR SELECT */}
-
         <div className="flex justify-center gap-3">
 
           {[3,4,5].map(p=>(
@@ -252,13 +254,9 @@ export default function PlayMatch() {
 
         </div>
 
-        {/* PLAYER A */}
-
         <div
           className={`bg-slate-800 p-5 rounded-xl ${
-            leaderA
-              ?"border border-green-400"
-              :""
+            leaderA ? "border border-green-400" : ""
           }`}
         >
 
@@ -268,7 +266,7 @@ export default function PlayMatch() {
               {playerA}
             </div>
 
-            <div className="text-2xl font-bold text-green-400">
+            <div className="text-3xl font-bold text-green-400">
               {formatScore(toParA)}
             </div>
 
@@ -281,13 +279,9 @@ export default function PlayMatch() {
 
         </div>
 
-        {/* PLAYER B */}
-
         <div
           className={`bg-slate-800 p-5 rounded-xl ${
-            leaderB
-              ?"border border-green-400"
-              :""
+            leaderB ? "border border-green-400" : ""
           }`}
         >
 
@@ -297,7 +291,7 @@ export default function PlayMatch() {
               {playerB}
             </div>
 
-            <div className="text-2xl font-bold text-green-400">
+            <div className="text-3xl font-bold text-green-400">
               {formatScore(toParB)}
             </div>
 
@@ -310,16 +304,12 @@ export default function PlayMatch() {
 
         </div>
 
-        {/* SUBMIT */}
-
         <button
           onClick={submitHole}
           className="w-full py-4 rounded-xl bg-green-500 text-black font-bold text-lg"
         >
           Submit Hole {hole} Score
         </button>
-
-        {/* BETTING */}
 
         {enableBetting && (
 
@@ -342,10 +332,15 @@ export default function PlayMatch() {
                 Match: {matchStatus}
               </div>
             )}
+
           </div>
+
         )}
+
       </div>
+
     </div>
+
   )
 
 }
