@@ -33,9 +33,6 @@ export default function PlayMatch() {
     return n.toString();
   }
 
-  const grossA = history.reduce((t,h)=>t+h.a,0);
-  const grossB = history.reduce((t,h)=>t+h.b,0);
-
   const toParA = history.reduce((t,h)=>t+(h.a-h.par),0);
   const toParB = history.reduce((t,h)=>t+(h.b-h.par),0);
 
@@ -68,29 +65,6 @@ export default function PlayMatch() {
     setHole(hole+1);
   }
 
-  function autoSubmit(player:"A"|"B",score:number){
-
-    if(player==="A"){
-
-      setScoreA(score);
-
-      if(scoreB!==null){
-        submitHole();
-      }
-
-    }
-
-    if(player==="B"){
-
-      setScoreB(score);
-
-      if(scoreA!==null){
-        submitHole();
-      }
-
-    }
-  }
-
   function getShape(score:number){
 
     const diff = score-par;
@@ -112,10 +86,10 @@ export default function PlayMatch() {
 
   function ScoreButtons({
     selected,
-    player
+    setScore
   }:{
     selected:number|null
-    player:"A"|"B"
+    setScore:(n:number)=>void
   }){
 
     return(
@@ -126,7 +100,7 @@ export default function PlayMatch() {
 
           <button
             key={n}
-            onClick={()=>autoSubmit(player,n)}
+            onClick={()=>setScore(n)}
             className={`w-14 h-14 flex items-center justify-center text-lg font-semibold bg-slate-800 transition
             ${getShape(n)}
             ${selected===n ? "bg-sky-500 text-black scale-110":""}`}
@@ -317,7 +291,7 @@ export default function PlayMatch() {
 
           <ScoreButtons
             selected={scoreA}
-            player="A"
+            setScore={setScoreA}
           />
 
         </div>
@@ -346,12 +320,21 @@ export default function PlayMatch() {
 
           <ScoreButtons
             selected={scoreB}
-            player="B"
+            setScore={setScoreB}
           />
 
         </div>
 
-        {/* LIVE BETTING PANEL */}
+        {/* SUBMIT BUTTON */}
+
+        <button
+          onClick={submitHole}
+          className="w-full py-4 rounded-xl bg-sky-400 text-black font-bold text-lg"
+        >
+          Submit Hole {hole} Score
+        </button>
+
+        {/* LIVE BETTING */}
 
         {enableBetting && (
 
