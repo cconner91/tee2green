@@ -2,6 +2,7 @@
 
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
+import { HoleScore } from "@/domain/types/holeResult";
 
 export default function PlayMatch() {
   const params = useSearchParams();
@@ -11,6 +12,8 @@ export default function PlayMatch() {
 
   const enableHandicaps = params.get("enableHandicaps") === "true";
   const enableBetting = params.get("enableBetting") === "true";
+  const gameType = params.get("gameType") || "STROKE_PLAY";
+
   const betAmount = Number(params.get("betAmount") || 0);
 
   const [par, setPar] = useState(4);
@@ -19,26 +22,24 @@ export default function PlayMatch() {
   const [scoreA, setScoreA] = useState<number | null>(null);
   const [scoreB, setScoreB] = useState<number | null>(null);
 
-  const [history, setHistory] = useState<
-  { hole: number; a: number; b: number }[]
-  >([]);
+  const [history, setHistory] = useState<HoleScore[]>([]);
 
   function getScoreStyle(score: number) {
     const diff = score - par;
 
     if (diff <= -2)
-      return "border-4 rounded-full border-sky-400 ring-2 ring-sky-400";
+      return "border border-sky-400 rounded-full ring-2 ring-sky-400";
 
     if (diff === -1)
-      return "border-2 rounded-full border-sky-400";
+      return "border border-sky-400 rounded-full";
 
     if (diff === 0)
-      return "border border-slate-600";
+      return "border-0";
 
     if (diff === 1)
-      return "border-2 border-orange-400";
+      return "border border-orange-400";
 
-    return "border-4 border-red-500";
+    return "border border-red-500 ring-2 ring-red-500";
   }
 
   function submitHole() {
@@ -68,6 +69,18 @@ export default function PlayMatch() {
     ? (holeWinsA - holeWinsB) * betAmount
     : 0;
 
+  const grossTotalA = history.reduce((t, h) => t + h.a, 0);
+  const grossTotalB = history.reduce((t, h) => t + h.b, 0);
+
+  const grossToParA = history.reduce((t, h) => t + (h.a - par), 0);
+  const grossToParB = history.reduce((t, h) => t + (h.b - par), 0);
+
+  function formatScore(score: number) {
+    if (score === 0) return "E";
+    if (score > 0) return `+${score}`;
+    return score.toString();
+  }
+
   function ScoreGrid({
     selected,
     onSelect,
@@ -85,7 +98,7 @@ export default function PlayMatch() {
               getScoreStyle(n)
             } ${
               selected === n
-                ? "scale-110 bg-sky-400/20"
+                ? "scale-110 bg-sky-500/20 border-sky-400"
                 : ""
             }`}
           >
@@ -96,23 +109,48 @@ export default function PlayMatch() {
     );
   }
 
+  function HoleTracker({ currentHole }: { currentHole: number }) {
+    return (
+      <div className="grid grid-cols-9 gap-1 text-xs text-center">
+        {[...Array(18)].map((_, i) => {
+          const holeNum = i + 1;
+
+          return (
+            <div
+              key={holeNum}
+              className={`py-1 rounded ${
+                holeNum < currentHole
+                  ? "bg-sky-400 text-black"
+                  : holeNum === currentHole
+                  ? "bg-slate-700"
+                  : "bg-slate-800 text-slate-500"
+              }`}
+            >
+              {holeNum}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 flex justify-center px-4">
       <div className="w-full max-w-md py-8 space-y-6">
-
-        {/* Header */}
 
         <div className="text-center space-y-1">
           <h1 className="text-2xl font-bold">
             Hole {hole}
           </h1>
 
-          <div className="text-sky-400 font-semibold">
-            {matchStatus}
-          </div>
+          {gameType === "MATCH_PLAY" && (
+            <div className="text-sky-400 font-semibold">
+              {matchStatus}
+            </div>
+          )}
         </div>
 
-        {/* Par Selection */}
+        <HoleTracker currentHole={hole} />
 
         <div className="flex justify-center gap-3">
           {[3,4,5].map((p) => (
@@ -130,11 +168,19 @@ export default function PlayMatch() {
           ))}
         </div>
 
-        {/* Player A */}
-
         <div className="bg-slate-800 p-5 rounded-xl">
-          <div className="font-semibold">
-            {playerA}
+          <div className="flex justify-between items-center">
+            <div className="font-semibold">{playerA}</div>
+
+            <div className="text-right text-sm">
+              <div className="text-slate-400 text-xs">Gross</div>
+              <div>{formatScore(grossToParA)}</div>
+            </div>
+
+            <div className="text-right text-sm">
+              <div className="text-slate-400 text-xs">Net</div>
+              <div>{formatScore(grossToParA)}</div>
+            </div>
           </div>
 
           <ScoreGrid
@@ -143,11 +189,19 @@ export default function PlayMatch() {
           />
         </div>
 
-        {/* Player B */}
-
         <div className="bg-slate-800 p-5 rounded-xl">
-          <div className="font-semibold">
-            {playerB}
+          <div className="flex justify-between items-center">
+            <div className="font-semibold">{playerB}</div>
+
+            <div className="text-right text-sm">
+              <div className="text-slate-400 text-xs">Gross</div>
+              <div>{formatScore(grossToParB)}</div>
+            </div>
+
+            <div className="text-right text-sm">
+              <div className="text-slate-400 text-xs">Net</div>
+              <div>{formatScore(grossToParB)}</div>
+            </div>
           </div>
 
           <ScoreGrid
@@ -156,8 +210,6 @@ export default function PlayMatch() {
           />
         </div>
 
-        {/* Submit */}
-
         <button
           onClick={submitHole}
           className="w-full py-4 rounded-xl bg-sky-400 text-black font-bold text-lg"
@@ -165,24 +217,22 @@ export default function PlayMatch() {
           Submit Hole {hole} Score
         </button>
 
-        {/* Match Panel */}
-
         <div className="bg-slate-800 rounded-xl p-4 space-y-2 text-sm">
 
           <div className="font-semibold">
             Match Summary
           </div>
 
-          <div>Match: {matchStatus}</div>
+          {gameType === "MATCH_PLAY" && (
+            <div>Match: {matchStatus}</div>
+          )}
 
           <div>
-            Front 9:{" "}
-            {hole <= 9 ? matchStatus : "Complete"}
+            Front 9: {hole <= 9 ? matchStatus : "Complete"}
           </div>
 
           <div>
-            Back 9:{" "}
-            {hole > 9 ? matchStatus : "—"}
+            Back 9: {hole > 9 ? matchStatus : "—"}
           </div>
 
           {enableBetting && (
@@ -192,8 +242,6 @@ export default function PlayMatch() {
           )}
 
         </div>
-
-        {/* Hole History */}
 
         <div className="bg-slate-800 rounded-xl p-4 space-y-1 text-sm">
 
