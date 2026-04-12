@@ -59,6 +59,7 @@ export function playHole(
 
   const result: HoleResult = {
     holeNumber: state.currentHole,
+    par: hole.par,
     grossScores: {
       [playerA.id]: grossA,
       [playerB.id]: grossB,

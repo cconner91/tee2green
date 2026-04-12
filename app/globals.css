@@ -4,6 +4,8 @@
 
 html, body {
   height: 100%;
+  /* Push content below iOS status bar when viewport-fit=cover is active */
+  padding-top: env(safe-area-inset-top, 0px);
 }
 
 body {
@@ -11,15 +13,29 @@ body {
   color: #f8fafc;            /* soft white */
   font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
     "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  /* Prevent pull-to-refresh and overscroll bounce */
+  overscroll-behavior: none;
+}
+
+/* Eliminate tap flash on all interactive elements */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Prevent 300ms double-tap zoom delay on buttons and links */
+button, a, [role="button"] {
+  touch-action: manipulation;
 }
 /* Remove number input arrows (Chrome, Safari, Edge) */
 input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button {
   -webkit-appearance: none;
+  appearance: none;
   margin: 0;
 }
 
-/* Remove number input arrows (Firefox) */
+/* Remove number input arrows (Firefox + standard) */
 input[type="number"] {
   -moz-appearance: textfield;
+  appearance: textfield;
 }

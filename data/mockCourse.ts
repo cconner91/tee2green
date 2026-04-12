@@ -1,25 +1,34 @@
 import { Course } from "../domain/models/Course";
 import { Hole } from "../domain/models/Hole";
 
-function generateHoles(): Hole[] {
-  const holes: Hole[] = [];
-
-  for (let i = 1; i <= 18; i++) {
-    holes.push({
-      number: i,
-      par: i % 5 === 0 ? 5 : 4, // simple variation
-      strokeIndex: i, // 1–18 difficulty ranking
-    });
-  }
-
-  return holes;
-}
+// Realistic 18-hole layout — par 72, slope 130, CR 72.0
+// Stroke index 1 = hardest hole, 18 = easiest
+const holes: Hole[] = [
+  { number: 1,  par: 4, strokeIndex: 7  },
+  { number: 2,  par: 5, strokeIndex: 3  },
+  { number: 3,  par: 3, strokeIndex: 17 },
+  { number: 4,  par: 4, strokeIndex: 1  },
+  { number: 5,  par: 4, strokeIndex: 11 },
+  { number: 6,  par: 3, strokeIndex: 15 },
+  { number: 7,  par: 5, strokeIndex: 5  },
+  { number: 8,  par: 4, strokeIndex: 9  },
+  { number: 9,  par: 4, strokeIndex: 13 },
+  { number: 10, par: 4, strokeIndex: 4  },
+  { number: 11, par: 4, strokeIndex: 8  },
+  { number: 12, par: 3, strokeIndex: 18 },
+  { number: 13, par: 5, strokeIndex: 2  },
+  { number: 14, par: 4, strokeIndex: 12 },
+  { number: 15, par: 3, strokeIndex: 16 },
+  { number: 16, par: 4, strokeIndex: 6  },
+  { number: 17, par: 5, strokeIndex: 10 },
+  { number: 18, par: 4, strokeIndex: 14 },
+];
 
 export const mockCourse: Course = {
-  id: "mock-course-1",
-  name: "Tee2Green Test Course",
+  id: "generic-course",
+  name: "Tee2Green Golf Course",
   par: 72,
   slopeRating: 130,
-  courseRating: 72,
-  holes: generateHoles(),
+  courseRating: 72.0,
+  holes,
 };

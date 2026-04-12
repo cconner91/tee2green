@@ -3,82 +3,113 @@ import {
   ScoringFormat,
   GameplayFormat,
   MatchupFormat,
+  BettingMode,
 } from "./types";
 
 export const gameDefinitions: GolfGameDefinition[] = [
   {
     id: "stroke-play-game",
-    name: "Stroke Play Game",
-    description:
-      "Lowest total strokes over 18 holes wins.",
-
+    name: "Stroke Play",
+    description: "Lowest total strokes over 18 holes wins. The classic format.",
     scoringFormat: ScoringFormat.StrokePlay,
     gameplayFormat: GameplayFormat.Individual,
     matchupFormat: MatchupFormat.H2H,
-
+    bettingMode: BettingMode.Standard,
     minPlayers: 2,
     maxPlayers: 8,
-
     bettingEnabled: true,
     handicapEnabled: true,
-
-    tags: ["Classic", "Total Score"],
+    tags: ["Classic", "Individual"],
   },
-
   {
     id: "match-play-game",
-    name: "Match Play Game",
-    description:
-      "Hole-by-hole competition. Most holes won wins the match.",
-
+    name: "Match Play",
+    description: "Win holes, not strokes. Most holes won takes the match.",
     scoringFormat: ScoringFormat.MatchPlay,
     gameplayFormat: GameplayFormat.Individual,
     matchupFormat: MatchupFormat.H2H,
-
+    bettingMode: BettingMode.Standard,
     minPlayers: 2,
-    maxPlayers: 4,
-
+    maxPlayers: 2,
     bettingEnabled: true,
     handicapEnabled: true,
-
-    tags: ["Classic", "Head to Head"],
+    tags: ["Classic", "H2H"],
   },
-
+  {
+    id: "nassau",
+    name: "Nassau",
+    description:
+      "Three bets in one: front 9, back 9, and overall — each a separate match play competition settled independently.",
+    scoringFormat: ScoringFormat.MatchPlay,
+    gameplayFormat: GameplayFormat.Individual,
+    matchupFormat: MatchupFormat.H2H,
+    // Nassau IS match play scoring — what makes it distinct is the betting structure
+    bettingMode: BettingMode.Nassau,
+    minPlayers: 2,
+    maxPlayers: 2,
+    bettingEnabled: true,
+    handicapEnabled: true,
+    tags: ["Betting", "H2H", "Classic"],
+  },
+  {
+    id: "skins-game",
+    name: "Skins",
+    description:
+      "Each hole is worth a skin. Ties carry the skin to the next hole — pressure builds fast.",
+    scoringFormat: ScoringFormat.StrokePlay,
+    gameplayFormat: GameplayFormat.Individual,
+    matchupFormat: MatchupFormat.H2H,
+    // Skins uses stroke-play per-hole scoring, but the betting structure is per-hole carry-over
+    bettingMode: BettingMode.Skins,
+    minPlayers: 2,
+    maxPlayers: 8,
+    bettingEnabled: true,
+    handicapEnabled: true,
+    tags: ["Betting", "Per Hole", "Multi-Player"],
+  },
+  {
+    id: "stableford",
+    name: "Stableford",
+    description:
+      "Score points per hole relative to par: Eagle=4, Birdie=3, Par=2, Bogey=1, Double+=0. Most points wins.",
+    scoringFormat: ScoringFormat.PointsBased,
+    gameplayFormat: GameplayFormat.Individual,
+    matchupFormat: MatchupFormat.H2H,
+    bettingMode: BettingMode.Standard,
+    minPlayers: 2,
+    maxPlayers: 8,
+    bettingEnabled: true,
+    handicapEnabled: true,
+    tags: ["Points", "Individual", "Fun"],
+  },
   {
     id: "team-best-ball",
-    name: "Team Best Ball",
+    name: "Best Ball",
     description:
-      "Teams of 2. Each player plays their own ball. Lowest score per team counts.",
-
+      "Teams of 2. Each player plays their own ball — the best score on each hole counts for the team.",
     scoringFormat: ScoringFormat.StrokePlay,
     gameplayFormat: GameplayFormat.BestBall,
     matchupFormat: MatchupFormat.TeamPlay,
-
+    bettingMode: BettingMode.Standard,
     minPlayers: 4,
     maxPlayers: 8,
-
     bettingEnabled: true,
     handicapEnabled: true,
-
-    tags: ["Team", "Best Ball"],
+    tags: ["Team", "2v2"],
   },
-
   {
     id: "scramble-game",
     name: "Scramble",
     description:
-      "All players tee off. Best shot selected. All play from that position.",
-
+      "All players tee off, best shot is selected, and everyone plays from that spot. Repeat until holed.",
     scoringFormat: ScoringFormat.StrokePlay,
     gameplayFormat: GameplayFormat.Scramble,
     matchupFormat: MatchupFormat.TeamPlay,
-
+    bettingMode: BettingMode.Standard,
     minPlayers: 4,
     maxPlayers: 8,
-
     bettingEnabled: true,
-    handicapEnabled: true,
-
-    tags: ["Team", "Scramble"],
+    handicapEnabled: false,
+    tags: ["Team", "Fun", "Scramble"],
   },
 ];

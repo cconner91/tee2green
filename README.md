@@ -1,5 +1,3 @@
-
-
 # Tee2Green - The Ultimate Golf Scoring & Betting App
 
 
@@ -346,4 +344,3 @@ Before:
 ## 👤 Author
 
 Built by Charlie Conner
-

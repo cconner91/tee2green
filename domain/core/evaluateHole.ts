@@ -9,29 +9,19 @@ export function evaluateHole(
   grossScores: Record<PlayerId, number>,
   playingHandicaps: Record<PlayerId, number>
 ): HoleResult {
-
   const netScores: Record<PlayerId, number> = {};
 
-  // Calculate net scores per player
   for (const playerId in grossScores) {
-    const strokesReceived = getStrokesForHole(
-      playingHandicaps[playerId],
-      hole
-    );
-
-    netScores[playerId] = calculateNetScore(
-      grossScores[playerId],
-      strokesReceived
-    );
+    const strokesReceived = getStrokesForHole(playingHandicaps[playerId] ?? 0, hole);
+    netScores[playerId] = calculateNetScore(grossScores[playerId], strokesReceived);
   }
 
-  // Determine winner (lowest net score wins)
+  // Lowest net score wins the hole
   let winner: PlayerId | "TIE" = "TIE";
   let lowestScore = Infinity;
 
   for (const playerId in netScores) {
     const score = netScores[playerId];
-
     if (score < lowestScore) {
       lowestScore = score;
       winner = playerId;
@@ -42,8 +32,9 @@ export function evaluateHole(
 
   return {
     holeNumber: hole.number,
+    par: hole.par,
     grossScores,
     netScores,
-    winner
+    winner,
   };
 }
