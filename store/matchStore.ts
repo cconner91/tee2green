@@ -9,6 +9,8 @@ import { Hole } from "@/domain/models/Hole";
 import { Course } from "@/domain/models/Course";
 import { HoleResult } from "@/domain/core/HoleResult";
 import { mockCourse } from "@/data/mockCourse";
+import { APICourse, APITee } from "@/domain/course/types";
+import { adaptCourseForRound } from "@/domain/course/CourseService";
 import {
   calculateCourseHandicap,
   calculatePlayingHandicap,
@@ -31,10 +33,12 @@ export interface BettingConfig {
 }
 
 export interface SetupState {
-  step: 1 | 2 | 3 | 4;
+  step: 1 | 2 | 3 | 4 | 5;
   playerCount: number;
   players: PlayerDraft[];
   enableHandicaps: boolean;
+  selectedCourse: APICourse | null;
+  selectedTee: APITee | null;
   selectedGame: GolfGameDefinition | null;
   betting: BettingConfig;
 }
@@ -69,6 +73,8 @@ interface MatchStore {
   setSetupStep: (step: SetupState["step"]) => void;
   updatePlayers: (players: PlayerDraft[]) => void;
   setEnableHandicaps: (enabled: boolean) => void;
+  selectCourse: (course: APICourse, tee: APITee) => void;
+  clearCourse: () => void;
   selectGame: (game: GolfGameDefinition) => void;
   updateBetting: (partial: Partial<BettingConfig>) => void;
   clearSetup: () => void;
@@ -110,6 +116,8 @@ export const useMatchStore = create<MatchStore>()(
             playerCount,
             players,
             enableHandicaps: false,
+            selectedCourse: null,
+            selectedTee: null,
             selectedGame: null,
             betting: { ...defaultBetting },
           },
@@ -134,6 +142,18 @@ export const useMatchStore = create<MatchStore>()(
         set({ setup: { ...setup, enableHandicaps: enabled } });
       },
 
+      selectCourse: (course, tee) => {
+        const { setup } = get();
+        if (!setup) return;
+        set({ setup: { ...setup, selectedCourse: course, selectedTee: tee } });
+      },
+
+      clearCourse: () => {
+        const { setup } = get();
+        if (!setup) return;
+        set({ setup: { ...setup, selectedCourse: null, selectedTee: null } });
+      },
+
       selectGame: (game) => {
         const { setup } = get();
         if (!setup) return;
@@ -154,7 +174,10 @@ export const useMatchStore = create<MatchStore>()(
         const { setup } = get();
         if (!setup?.selectedGame) return;
 
-        const course = mockCourse;
+        const course =
+          setup.selectedCourse && setup.selectedTee
+            ? adaptCourseForRound(setup.selectedCourse, setup.selectedTee)
+            : mockCourse;
         // Deep copy holes so par edits during the round don't mutate the source
         const courseHoles: Hole[] = course.holes.map((h) => ({ ...h }));
 

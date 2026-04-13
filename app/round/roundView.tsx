@@ -83,7 +83,7 @@ function RoundComplete({ round, summary }: { round: ActiveRound; summary: RoundS
   );
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 max-w-md mx-auto px-4 py-10 space-y-6">
+    <div className="min-h-dvh text-slate-100 max-w-md mx-auto px-4 py-10 space-y-6">
       <div className="text-center space-y-1 pb-2">
         <div className="text-3xl mb-3">🏆</div>
         <h1 className="text-xl font-bold">Round Complete</h1>
@@ -706,9 +706,9 @@ export default function RoundView() {
   const currentPar = round.courseHoles[round.currentHole - 1].par;
 
   return (
-    <div className="min-h-dvh bg-slate-950 text-slate-100 flex flex-col max-w-md mx-auto">
+    <div className="min-h-dvh text-slate-100 flex flex-col max-w-md mx-auto">
       {/* Tab bar — sits below the 56px (h-14) NavShell header */}
-      <div className="flex border-b border-white/[0.06] bg-[#0a0a0a] sticky top-14 z-10">
+      <div className="flex border-b border-white/[0.06] bg-[#060d1a]/95 backdrop-blur-xl sticky top-14 z-10">
         <button
           onClick={() => setTab("hole")}
           className={`flex-1 py-3 text-sm font-medium transition border-b-2 ${

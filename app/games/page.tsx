@@ -14,7 +14,7 @@ function formatLabel(game: GolfGameDefinition): string {
   const fmt: string[] = [];
   if (game.scoringFormat === ScoringFormat.StrokePlay)  fmt.push("Stroke");
   if (game.scoringFormat === ScoringFormat.MatchPlay)   fmt.push("Match");
-  if (game.scoringFormat === ScoringFormat.PointsBased) fmt.push("Stableford");
+  if (game.scoringFormat === ScoringFormat.PointsBased) fmt.push("Points");
   if (game.bettingMode === BettingMode.Nassau) fmt.push("Nassau");
   if (game.bettingMode === BettingMode.Skins)  fmt.push("Skins");
   return fmt.join(" · ");
@@ -32,17 +32,26 @@ function GameCard({
   onPlay,
   onDelete,
   isCustom = false,
+  isStub = false,
 }: {
   game: GolfGameDefinition;
   onPlay: (game: GolfGameDefinition) => void;
   onDelete?: () => void;
   isCustom?: boolean;
+  isStub?: boolean;
 }) {
   return (
-    <div className="bg-[#111] border border-white/[0.07] rounded-xl p-4 space-y-3">
+    <div className={`bg-[#111] border border-white/[0.07] rounded-xl p-4 space-y-3 ${isStub ? "opacity-60" : ""}`}>
       <div className="flex items-start justify-between gap-2">
         <div>
-          <div className="font-semibold text-white">{game.name}</div>
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-white">{game.name}</span>
+            {isStub && (
+              <span className="text-[10px] uppercase tracking-wide bg-white/[0.06] text-slate-400 px-2 py-0.5 rounded">
+                Coming Soon
+              </span>
+            )}
+          </div>
           <div className="text-[11px] text-slate-500 mt-0.5">{formatLabel(game)}</div>
         </div>
         <div className="text-[11px] text-slate-500 shrink-0 mt-0.5">
@@ -68,42 +77,24 @@ function GameCard({
         )}
       </div>
 
-      <div className="flex items-center gap-2 pt-1">
-        <button
-          onClick={() => onPlay(game)}
-          className="flex-1 py-2 bg-emerald-500 text-black font-semibold text-sm rounded-lg hover:bg-emerald-400 active:scale-[0.98] transition"
-        >
-          Play This Game
-        </button>
-        {isCustom && onDelete && (
+      {!isStub && (
+        <div className="flex items-center gap-2 pt-1">
           <button
-            onClick={onDelete}
-            className="px-3 py-2 text-slate-500 hover:text-red-400 text-sm transition"
+            onClick={() => onPlay(game)}
+            className="flex-1 py-2 bg-emerald-500 text-black font-semibold text-sm rounded-lg hover:bg-emerald-400 active:scale-[0.98] transition"
           >
-            Delete
+            Play This Game
           </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─── Special format notice ─────────────────────────────────────────────────────
-
-function SpecialFormatsCard() {
-  return (
-    <div className="bg-[#111] border border-white/[0.07] rounded-xl p-4 space-y-2 opacity-60">
-      <div className="flex items-center justify-between">
-        <div className="font-semibold text-white">Wolf, Vegas &amp; More</div>
-        <span className="text-[10px] uppercase tracking-wide bg-white/[0.06] text-slate-400 px-2 py-0.5 rounded">
-          Coming Soon
-        </span>
-      </div>
-      <p className="text-slate-400 text-xs leading-relaxed">
-        Games like Wolf and Vegas require per-hole role assignment and custom
-        score-combination rules that go beyond the standard format axes. These
-        are on the roadmap as dedicated game engines.
-      </p>
+          {isCustom && onDelete && (
+            <button
+              onClick={onDelete}
+              className="px-3 py-2 text-slate-500 hover:text-red-400 text-sm transition"
+            >
+              Delete
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -133,18 +124,24 @@ export default function GamesPage() {
       )
     : allGames;
 
-  const standard = filtered.filter((g) => !customGames.some((c) => c.id === g.id));
-  const custom   = filtered.filter((g) =>  customGames.some((c) => c.id === g.id));
+  const isCustomGame = (g: GolfGameDefinition) => customGames.some((c) => c.id === g.id);
+
+  const playable   = filtered.filter((g) => !isCustomGame(g) && g.engineStatus !== "stub");
+  const comingSoon = filtered.filter((g) => !isCustomGame(g) && g.engineStatus === "stub");
+  const custom     = filtered.filter((g) => isCustomGame(g));
+
+  const playableCount = gameDefinitions.filter((g) => g.engineStatus !== "stub").length
+    + (mounted ? customGames.length : 0);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 max-w-md mx-auto px-4 py-8 space-y-8">
+    <div className="min-h-dvh text-slate-100 max-w-md mx-auto px-4 py-8 space-y-8">
 
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold">Game Library</h1>
           <p className="text-slate-500 text-sm mt-0.5">
-            {allGames.length} games available
+            {playableCount} playable · {gameDefinitions.filter((g) => g.engineStatus === "stub").length} coming soon
           </p>
         </div>
         <Link
@@ -187,20 +184,21 @@ export default function GamesPage() {
         </div>
       </div>
 
-      {/* Standard games */}
-      <div className="space-y-3">
-        <div className="text-[10px] uppercase tracking-widest text-slate-500">
-          Official Games
+      {/* Playable games */}
+      {playable.length > 0 && (
+        <div className="space-y-3">
+          <div className="text-[10px] uppercase tracking-widest text-slate-500">
+            Official Games
+          </div>
+          {playable.map((game) => (
+            <GameCard
+              key={game.id}
+              game={game}
+              onPlay={handlePlay}
+            />
+          ))}
         </div>
-        {standard.map((game) => (
-          <GameCard
-            key={game.id}
-            game={game}
-            onPlay={handlePlay}
-          />
-        ))}
-        <SpecialFormatsCard />
-      </div>
+      )}
 
       {/* Custom games */}
       {mounted && custom.length > 0 && (
@@ -215,6 +213,23 @@ export default function GamesPage() {
               onPlay={handlePlay}
               onDelete={() => removeCustomGame(game.id)}
               isCustom
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Coming soon */}
+      {comingSoon.length > 0 && (
+        <div className="space-y-3">
+          <div className="text-[10px] uppercase tracking-widest text-slate-500">
+            Coming Soon
+          </div>
+          {comingSoon.map((game) => (
+            <GameCard
+              key={game.id}
+              game={game}
+              onPlay={handlePlay}
+              isStub
             />
           ))}
         </div>

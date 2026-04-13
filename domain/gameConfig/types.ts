@@ -57,4 +57,14 @@ export interface GolfGameDefinition {
   handicapEnabled: boolean;
 
   tags: string[];
+
+  /**
+   * "ready"  — fully wired to the scoring engine, playable today.
+   * "stub"   — shown in the Game Library as "coming soon" but blocked in setup.
+   *            Games that need a custom per-hole engine (Wolf, Vegas, Bingo Bango
+   *            Bongo) or team-assignment UI (Team Match Play, Ryder Cup) live here
+   *            until their dedicated engines are built.
+   * Omitting this field is equivalent to "ready".
+   */
+  engineStatus?: "ready" | "stub";
 }

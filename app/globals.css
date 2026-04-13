@@ -9,10 +9,14 @@ html, body {
 }
 
 body {
-  background-color: #0f172a; /* deep slate */
-  color: #f8fafc;            /* soft white */
-  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
-    "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: var(--font-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #f8fafc;
+  /* Gradient background — fixed so it persists while scrolling */
+  background-color: #060d1a;
+  background-image:
+    radial-gradient(ellipse 140% 55% at 50% -5%, rgba(16, 185, 129, 0.13) 0%, transparent 65%),
+    radial-gradient(ellipse 70% 50% at 105% 95%, rgba(14, 165, 233, 0.06) 0%, transparent 60%);
+  background-attachment: fixed;
   /* Prevent pull-to-refresh and overscroll bounce */
   overscroll-behavior: none;
 }

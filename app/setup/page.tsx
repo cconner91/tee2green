@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMatchStore, SetupState } from "@/store/matchStore";
 import { useGameLibraryStore } from "@/store/gameLibraryStore";
 import { GolfGameDefinition, BettingMode, ScoringFormat } from "@/domain/gameConfig/types";
 import { gameDefinitions } from "@/domain/gameConfig/definitions";
 import { getGamesForPlayerCount } from "@/domain/gameConfig/filters";
+import { APICourse, APITee, getTeeName } from "@/domain/course/types";
+import { searchCourses, getCourseById } from "@/domain/course/CourseService";
 
 // ─── Shared ───────────────────────────────────────────────────────────────────
 
@@ -129,7 +131,170 @@ function StepPlayers() {
   );
 }
 
-// ─── Step 3: Game selection ───────────────────────────────────────────────────
+// ─── Step 3: Course selection ─────────────────────────────────────────────────
+
+function StepCourse() {
+  const { setup, selectCourse, clearCourse } = useMatchStore();
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<APICourse[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<number | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  if (!setup) return null;
+
+  function handleQueryChange(val: string) {
+    setQuery(val);
+    setError(null);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!val.trim()) { setResults([]); return; }
+
+    debounceRef.current = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const searchResults = await searchCourses(val);
+        // Fetch full detail for first 5 results so we have tee data
+        const detailed = await Promise.all(
+          searchResults.slice(0, 5).map((r) => getCourseById(r.id))
+        );
+        setResults(detailed);
+      } catch (e) {
+        setError("Search failed. Check your connection and try again.");
+      } finally {
+        setLoading(false);
+      }
+    }, 500);
+  }
+
+  function handleSelectTee(course: APICourse, tee: APITee) {
+    selectCourse(course, tee);
+    setResults([]);
+    setQuery("");
+    setExpanded(null);
+  }
+
+  const selected = setup.selectedCourse;
+  const selectedTee = setup.selectedTee;
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h2 className="text-xl font-bold">Select a course</h2>
+        <p className="text-slate-500 text-sm mt-1">
+          Optional — skip to use a generic course.
+        </p>
+      </div>
+
+      {/* Selected course display */}
+      {selected && selectedTee && (
+        <div className="bg-emerald-500/[0.08] border border-emerald-500/30 rounded-xl p-4 flex items-start justify-between gap-3">
+          <div>
+            <div className="font-semibold text-sm text-white">{selected.name}</div>
+            <div className="text-emerald-400 text-xs mt-0.5">
+              {getTeeName(selectedTee)} tees · {selectedTee.parTotal} par · {selectedTee.totalYards.toLocaleString()} yds
+            </div>
+            <div className="text-slate-500 text-xs mt-0.5">
+              CR {selectedTee.courseRating} / Slope {selectedTee.slopeRating}
+            </div>
+          </div>
+          <button
+            onClick={() => clearCourse()}
+            className="text-slate-500 hover:text-red-400 text-xs shrink-0 transition"
+          >
+            Change
+          </button>
+        </div>
+      )}
+
+      {/* Search input */}
+      {!selected && (
+        <div className="space-y-3">
+          <div className="relative">
+            <input
+              value={query}
+              onChange={(e) => handleQueryChange(e.target.value)}
+              placeholder="Search by course name…"
+              className="w-full bg-white/[0.05] border border-white/[0.07] rounded-xl px-4 py-3 text-white placeholder-slate-700 focus:outline-none focus:border-emerald-500/40 text-sm transition pr-10"
+            />
+            {loading && (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                <div className="w-4 h-4 border-2 border-emerald-500/40 border-t-emerald-500 rounded-full animate-spin" />
+              </div>
+            )}
+          </div>
+
+          {error && (
+            <p className="text-red-400 text-xs">{error}</p>
+          )}
+
+          {/* Results */}
+          {results.length > 0 && (
+            <div className="space-y-2">
+              {results.map((course) => (
+                <div
+                  key={course.id}
+                  className="bg-[#111] border border-white/[0.07] rounded-xl overflow-hidden"
+                >
+                  <button
+                    onClick={() => setExpanded(expanded === course.id ? null : course.id)}
+                    className="w-full px-4 py-3 text-left flex items-center justify-between gap-2"
+                  >
+                    <div>
+                      <div className="font-medium text-sm text-white">{course.name}</div>
+                      <div className="text-slate-500 text-xs mt-0.5">
+                        {course.location.city}, {course.location.state} · {course.tees.length} tee sets
+                      </div>
+                    </div>
+                    <svg
+                      width="14" height="14" viewBox="0 0 24 24" fill="none"
+                      stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+                      className={`text-slate-600 shrink-0 transition-transform ${expanded === course.id ? "rotate-180" : ""}`}
+                    >
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  </button>
+
+                  {expanded === course.id && (
+                    <div className="border-t border-white/[0.05] px-4 py-2 space-y-1">
+                      {course.tees.map((tee) => (
+                        <button
+                          key={getTeeName(tee)}
+                          onClick={() => handleSelectTee(course, tee)}
+                          className="w-full flex items-center justify-between py-2.5 hover:text-emerald-400 transition text-left group"
+                        >
+                          <div>
+                            <span className="text-sm font-medium group-hover:text-emerald-400 transition">
+                              {getTeeName(tee)}
+                            </span>
+                            <span className="text-slate-600 text-xs ml-2">
+                              {tee.totalYards.toLocaleString()} yds
+                            </span>
+                          </div>
+                          <div className="text-slate-600 text-xs text-right">
+                            CR {tee.courseRating} / {tee.slopeRating}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {query && !loading && results.length === 0 && !error && (
+            <p className="text-slate-600 text-xs text-center py-4">
+              No courses found for &ldquo;{query}&rdquo;
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Step 4: Game selection ───────────────────────────────────────────────────
 
 function formatBadge(game: GolfGameDefinition): string {
   if (game.bettingMode === BettingMode.Nassau) return "Nassau";
@@ -184,7 +349,10 @@ function StepGame() {
 
   if (!setup) return null;
 
-  const allGames = [...gameDefinitions, ...(mounted ? customGames : [])];
+  const allGames = [
+    ...gameDefinitions.filter((g) => g.engineStatus !== "stub"),
+    ...(mounted ? customGames : []),
+  ];
   const available = getGamesForPlayerCount(setup.playerCount, allGames);
 
   return (
@@ -330,7 +498,7 @@ export default function SetupPage() {
   if (!setup) return null;
 
   const canAdvance =
-    setup.step === 3 ? setup.selectedGame !== null : true;
+    setup.step === 4 ? setup.selectedGame !== null : true;
 
   function handleBack() {
     if (setup!.step === 1) router.push("/");
@@ -339,7 +507,7 @@ export default function SetupPage() {
 
   function handleNext() {
     if (!canAdvance) return;
-    if (setup!.step < 4) {
+    if (setup!.step < 5) {
       setSetupStep((setup!.step + 1) as SetupState["step"]);
     } else {
       startRound();
@@ -347,10 +515,10 @@ export default function SetupPage() {
     }
   }
 
-  const stepLabels = ["Group", "Players", "Game", "Betting"];
+  const stepLabels = ["Group", "Players", "Course", "Game", "Betting"];
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col max-w-md mx-auto">
+    <div className="min-h-dvh text-slate-100 flex flex-col max-w-md mx-auto">
       {/* Header */}
       <div className="px-4 pt-5 pb-4 border-b border-white/[0.05]">
         <div className="flex items-center justify-between mb-4">
@@ -386,7 +554,7 @@ export default function SetupPage() {
         <div className="h-px bg-white/[0.06] rounded-full overflow-hidden">
           <div
             className="h-full bg-emerald-500 rounded-full transition-all duration-300"
-            style={{ width: `${(setup.step / 4) * 100}%` }}
+            style={{ width: `${(setup.step / 5) * 100}%` }}
           />
         </div>
       </div>
@@ -395,8 +563,9 @@ export default function SetupPage() {
       <div className="flex-1 px-4 py-6 overflow-y-auto">
         {setup.step === 1 && <StepGroupSize />}
         {setup.step === 2 && <StepPlayers />}
-        {setup.step === 3 && <StepGame />}
-        {setup.step === 4 && <StepBetting />}
+        {setup.step === 3 && <StepCourse />}
+        {setup.step === 4 && <StepGame />}
+        {setup.step === 5 && <StepBetting />}
       </div>
 
       {/* Footer */}
@@ -410,9 +579,9 @@ export default function SetupPage() {
               : "bg-white/[0.04] text-slate-700 cursor-not-allowed"
           }`}
         >
-          {setup.step === 4 ? "Start Round →" : "Continue →"}
+          {setup.step === 5 ? "Start Round →" : "Continue →"}
         </button>
-        {setup.step === 3 && !setup.selectedGame && (
+        {setup.step === 4 && !setup.selectedGame && (
           <p className="text-center text-slate-700 text-xs mt-2">
             Select a game to continue
           </p>
