@@ -10,6 +10,7 @@ export enum GameplayFormat {
   Scramble = "Scramble",
   Shamble = "Shamble",
   AltShot = "AltShot",
+  ModifiedAltShot = "ModifiedAltShot",
 }
 
 export enum MatchupFormat {

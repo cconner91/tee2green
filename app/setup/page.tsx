@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useMatchStore, SetupState } from "@/store/matchStore";
+import { useMatchStore, SetupState, ManualCourseDetails } from "@/store/matchStore";
 import { useGameLibraryStore } from "@/store/gameLibraryStore";
 import {
   GolfGameDefinition,
@@ -181,13 +181,24 @@ function StepPlayers() {
 
 // ─── Step 3: Course selection ─────────────────────────────────────────────────
 
+const DEFAULT_MANUAL: ManualCourseDetails = {
+  name: "",
+  par: 72,
+  courseRating: 72.0,
+  slopeRating: 113,
+};
+
 function StepCourse() {
-  const { setup, selectCourse, clearCourse, setSetupStep } = useMatchStore();
+  const { setup, selectCourse, clearCourse, setSetupStep, setManualCourse } = useMatchStore();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<APICourse[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<number | null>(null);
+  const [showManual, setShowManual] = useState(false);
+  const [manualFields, setManualFields] = useState<ManualCourseDetails>(
+    setup?.manualCourse ?? DEFAULT_MANUAL
+  );
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   if (!setup) return null;
@@ -216,11 +227,27 @@ function StepCourse() {
 
   function handleSelectTee(course: APICourse, tee: APITee) {
     selectCourse(course, tee);
+    setManualCourse(null);
     setResults([]);
     setQuery("");
     setExpanded(null);
-    // Auto-advance to game selection
     setTimeout(() => setSetupStep(4), 350);
+  }
+
+  function handleManualField(field: keyof ManualCourseDetails, value: string | number) {
+    const updated = { ...manualFields, [field]: value };
+    setManualFields(updated);
+    // Only save to store if any meaningful value is set
+    const hasData = updated.courseRating !== 72.0 || updated.slopeRating !== 113 || updated.name.trim();
+    setManualCourse(hasData ? updated : null);
+  }
+
+  function toggleManual(show: boolean) {
+    setShowManual(show);
+    if (!show) {
+      setManualFields(DEFAULT_MANUAL);
+      setManualCourse(null);
+    }
   }
 
   const selected = setup.selectedCourse;
@@ -231,10 +258,11 @@ function StepCourse() {
       <div>
         <h2 className="text-2xl font-bold tracking-tight">Select a course</h2>
         <p className="text-slate-500 text-sm mt-1.5">
-          Optional — skip to use a generic course.
+          Search for your course, enter details manually, or skip.
         </p>
       </div>
 
+      {/* Selected course confirmation */}
       {selected && selectedTee && (
         <div className="bg-emerald-500/[0.08] border border-emerald-500/25 rounded-2xl p-4 flex items-start justify-between gap-3">
           <div>
@@ -255,6 +283,7 @@ function StepCourse() {
         </div>
       )}
 
+      {/* Search */}
       {!selected && (
         <div className="space-y-3">
           <div className="relative">
@@ -298,7 +327,6 @@ function StepCourse() {
                       <polyline points="6 9 12 15 18 9" />
                     </svg>
                   </button>
-
                   {expanded === course.id && (
                     <div className="border-t border-white/[0.05] px-4 py-2 space-y-0.5">
                       {course.tees.map((tee) => (
@@ -328,10 +356,95 @@ function StepCourse() {
           )}
 
           {query && !loading && results.length === 0 && !error && (
-            <p className="text-slate-600 text-xs text-center py-6">
+            <p className="text-slate-600 text-xs text-center py-4">
               No courses found for &ldquo;{query}&rdquo;
             </p>
           )}
+
+          {/* Manual entry section */}
+          <div className="border border-white/[0.07] rounded-2xl overflow-hidden">
+            <button
+              onClick={() => toggleManual(!showManual)}
+              className="w-full flex items-center justify-between px-4 py-3.5 text-left"
+            >
+              <div>
+                <div className="text-sm font-semibold text-white">
+                  {showManual ? "Manual Entry" : "Enter Course Details Manually"}
+                </div>
+                <div className="text-slate-600 text-xs mt-0.5">
+                  {showManual
+                    ? "CR & Slope used for handicap calculations"
+                    : "Useful for local or unlisted courses"}
+                </div>
+              </div>
+              <svg
+                width="14" height="14" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+                className={`text-slate-600 shrink-0 transition-transform ${showManual ? "rotate-180" : ""}`}
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+
+            {showManual && (
+              <div className="border-t border-white/[0.05] px-4 py-4 space-y-3 bg-white/[0.02]">
+                <div>
+                  <div className="text-[10px] uppercase tracking-widest text-slate-600 mb-1.5">Course Name (optional)</div>
+                  <input
+                    value={manualFields.name}
+                    onChange={(e) => handleManualField("name", e.target.value)}
+                    placeholder="e.g. Pebble Beach Golf Links"
+                    className="w-full bg-white/[0.04] border border-white/[0.07] rounded-xl px-3.5 py-2.5 text-white placeholder-slate-700 focus:outline-none focus:border-emerald-500/40 text-sm transition"
+                  />
+                </div>
+                <div className="grid grid-cols-3 gap-2.5">
+                  <div>
+                    <div className="text-[10px] uppercase tracking-widest text-slate-600 mb-1.5">Par</div>
+                    <input
+                      type="number"
+                      value={manualFields.par}
+                      onChange={(e) => handleManualField("par", parseInt(e.target.value) || 72)}
+                      className="w-full bg-white/[0.04] border border-white/[0.07] rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-emerald-500/40 text-sm transition text-center"
+                      min={54} max={90}
+                    />
+                  </div>
+                  <div>
+                    <div className="text-[10px] uppercase tracking-widest text-slate-600 mb-1.5">Course Rating</div>
+                    <input
+                      type="number"
+                      value={manualFields.courseRating}
+                      onChange={(e) => handleManualField("courseRating", parseFloat(e.target.value) || 72.0)}
+                      className="w-full bg-white/[0.04] border border-white/[0.07] rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-emerald-500/40 text-sm transition text-center"
+                      min={60} max={80} step={0.1}
+                    />
+                  </div>
+                  <div>
+                    <div className="text-[10px] uppercase tracking-widest text-slate-600 mb-1.5">Slope</div>
+                    <input
+                      type="number"
+                      value={manualFields.slopeRating}
+                      onChange={(e) => handleManualField("slopeRating", parseInt(e.target.value) || 113)}
+                      className="w-full bg-white/[0.04] border border-white/[0.07] rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-emerald-500/40 text-sm transition text-center"
+                      min={55} max={155}
+                    />
+                  </div>
+                </div>
+                <p className="text-slate-700 text-[10px]">
+                  CR &amp; Slope drive handicap stroke allocation. Hole-by-hole pars use a standard Par 72 layout.
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Skip */}
+          <div className="text-center">
+            <button
+              onClick={() => setSetupStep(4)}
+              className="text-slate-500 text-xs hover:text-slate-300 transition"
+            >
+              Continue without a course →
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -670,11 +783,120 @@ function StepBetting() {
   );
 }
 
+// ─── Match summary modal ──────────────────────────────────────────────────────
+
+function SummaryRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-start justify-between gap-4 py-3 border-t border-white/[0.06]">
+      <div className="text-[10px] uppercase tracking-widest text-slate-600 font-semibold shrink-0 mt-0.5 w-20">
+        {label}
+      </div>
+      <div className="flex-1 text-right space-y-0.5">{children}</div>
+    </div>
+  );
+}
+
+function MatchSummaryModal({
+  setup,
+  onConfirm,
+  onEdit,
+}: {
+  setup: SetupState;
+  onConfirm: () => void;
+  onEdit: () => void;
+}) {
+  const players = setup.players.slice(0, setup.playerCount);
+  const { selectedCourse, selectedTee, manualCourse, selectedGame, selectedFormat, betting, enableHandicaps } = setup;
+
+  const courseName = selectedCourse
+    ? selectedCourse.name
+    : manualCourse?.name || "Generic Course";
+
+  const courseDetail = selectedCourse && selectedTee
+    ? `${getTeeName(selectedTee)} · CR ${selectedTee.courseRating} · Slope ${selectedTee.slopeRating}`
+    : manualCourse
+    ? `CR ${manualCourse.courseRating} · Slope ${manualCourse.slopeRating} · Par ${manualCourse.par}`
+    : "Par 72 · CR 72.0 · Slope 130";
+
+  const bettingLabel = !betting.enabled
+    ? "Disabled"
+    : betting.structure === "Nassau"
+    ? `Nassau · $${betting.amount}/segment`
+    : betting.structure === "HoleByHole"
+    ? `$${betting.amount}/hole`
+    : `$${betting.amount} full match`;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-sm">
+      <div className="w-full max-w-md bg-[#0c1628] border-t border-white/[0.08] rounded-t-3xl px-5 pt-5 pb-[env(safe-area-inset-bottom,20px)] overflow-y-auto max-h-[92vh]">
+
+        {/* Handle */}
+        <div className="w-10 h-1 bg-white/10 rounded-full mx-auto mb-5" />
+
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-lg font-bold">Match Summary</h2>
+          <button onClick={onEdit} className="text-slate-500 text-sm hover:text-white transition">
+            ← Edit
+          </button>
+        </div>
+        <p className="text-slate-600 text-xs mb-1">Review your setup before starting.</p>
+
+        <div className="space-y-0 pb-5">
+          <SummaryRow label="Players">
+            {players.map((p, i) => (
+              <div key={i} className="flex items-center justify-end gap-2">
+                <span className="text-white text-sm font-medium">
+                  {p.name.trim() || `Player ${i + 1}`}
+                </span>
+                {enableHandicaps && p.handicapIndex > 0 && (
+                  <span className="text-slate-500 text-xs">HCP {p.handicapIndex}</span>
+                )}
+              </div>
+            ))}
+          </SummaryRow>
+
+          <SummaryRow label="Game">
+            <div className="text-white text-sm font-medium">{selectedGame?.name}</div>
+            {selectedFormat && (
+              <div className="text-slate-500 text-xs">{selectedFormat.label}</div>
+            )}
+          </SummaryRow>
+
+          <SummaryRow label="Course">
+            <div className="text-white text-sm font-medium">{courseName}</div>
+            <div className="text-slate-500 text-xs">{courseDetail}</div>
+          </SummaryRow>
+
+          <SummaryRow label="Handicaps">
+            <span className={`text-sm font-medium ${enableHandicaps ? "text-emerald-400" : "text-slate-500"}`}>
+              {enableHandicaps ? "On" : "Off"}
+            </span>
+          </SummaryRow>
+
+          <SummaryRow label="Betting">
+            <span className={`text-sm font-medium ${betting.enabled ? "text-emerald-400" : "text-slate-500"}`}>
+              {bettingLabel}
+            </span>
+          </SummaryRow>
+        </div>
+
+        <button
+          onClick={onConfirm}
+          className="w-full py-4 rounded-2xl font-black text-sm text-black bg-emerald-500 hover:bg-emerald-400 active:scale-[0.98] transition shadow-[0_4px_24px_rgba(16,185,129,0.3)]"
+        >
+          ⛳ Confirm &amp; Start Match
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function SetupPage() {
   const router = useRouter();
   const { setup, initSetup, setSetupStep, startRound } = useMatchStore();
+  const [showSummary, setShowSummary] = useState(false);
 
   useEffect(() => {
     if (!setup) initSetup(2);
@@ -728,17 +950,28 @@ export default function SetupPage() {
   function handleNext() {
     if (!canAdvance) return;
     if (setup!.step === 5) {
-      startRound();
-      router.push("/round");
+      setShowSummary(true);
     } else {
       setSetupStep((setup!.step + 1) as SetupState["step"]);
     }
+  }
+
+  function handleConfirmMatch() {
+    startRound();
+    router.push("/round");
   }
 
   const stepLabels = ["Group", "Players", "Course", "Game", "Betting"];
 
   return (
     <div className="text-slate-100 flex flex-col max-w-md mx-auto">
+      {showSummary && setup && (
+        <MatchSummaryModal
+          setup={setup}
+          onConfirm={handleConfirmMatch}
+          onEdit={() => setShowSummary(false)}
+        />
+      )}
       {/* Header — sticky below the NavShell top bar */}
       <div className="sticky top-14 z-20 bg-[#060d1a] px-4 pt-4 pb-3 border-b border-white/[0.06]">
         <div className="flex items-center justify-between mb-3">
@@ -799,7 +1032,7 @@ export default function SetupPage() {
                 : "bg-white/[0.04] text-slate-600 cursor-not-allowed border border-white/[0.07]"
             }`}
           >
-            {setup.step === 5 ? "Start Round →" : "Continue →"}
+            {setup.step === 5 ? "Review & Start →" : "Continue →"}
           </button>
           {setup.step === 2 && !allNamed && (
             <p className="text-center text-slate-600 text-xs mt-2">

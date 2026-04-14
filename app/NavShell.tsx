@@ -95,8 +95,18 @@ export default function NavShell({ children }: { children: React.ReactNode }) {
     <>
       {/* Top bar */}
       <div className="flex items-center justify-between px-4 h-14 border-b border-white/[0.06] bg-[#060d1a]/90 backdrop-blur-xl sticky top-0 z-40">
-        {/* Left spacer / back context handled per-page */}
-        <div className="w-10" />
+        {/* About link */}
+        <Link
+          href="/about"
+          className="w-10 h-10 flex items-center justify-center text-slate-500 hover:text-white transition-colors rounded-lg hover:bg-white/[0.06]"
+          aria-label="About Tee2Green"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="16" x2="12" y2="12" />
+            <line x1="12" y1="8" x2="12.01" y2="8" strokeWidth="2.5" />
+          </svg>
+        </Link>
 
         <Link href="/" className="flex items-center">
           <img src="/tee2green_logo.png" alt="Tee2Green" className="h-25 w-auto" />

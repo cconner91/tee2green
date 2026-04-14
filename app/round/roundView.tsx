@@ -32,11 +32,11 @@ function toParColor(n: number): string {
 function scoreRing(score: number, par: number): string {
   const d = score - par;
   if (score === 1 || d <= -3) return "rounded-full bg-emerald-500";                                     // Ace/Albatross — filled green
-  if (d === -2) return "rounded-full shadow-[0_0_0_1.5px_#34d399,0_0_0_3.5px_#34d399]";               // Eagle — 2 circle rings
+  if (d === -2) return "rounded-full shadow-[0_0_0_1.5px_#34d399,0_0_0_3px_#060d1a,0_0_0_4.5px_#34d399]"; // Eagle — 2 circle rings
   if (d === -1) return "rounded-full shadow-[0_0_0_2px_#38bdf8]";                                       // Birdie — 1 circle ring
   if (d === 0)  return "";                                                                               // Par — plain
   if (d === 1)  return "rounded shadow-[0_0_0_2px_#fb923c]";                                            // Bogey — 1 square ring
-  if (d === 2)  return "rounded shadow-[0_0_0_1.5px_#ef4444,0_0_0_3.5px_#ef4444]";                    // Double — 2 square rings
+  if (d === 2)  return "rounded shadow-[0_0_0_1.5px_#ef4444,0_0_0_3px_#060d1a,0_0_0_4.5px_#ef4444]"; // Double — 2 square rings
   return "rounded bg-red-700";                                                                           // Triple+ — filled red
 }
 

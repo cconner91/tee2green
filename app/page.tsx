@@ -134,6 +134,9 @@ export default function Home() {
         <p className="text-slate-400 text-[13px] font-medium leading-snug tracking-wide -mt-3">
           The Ultimate Golf Scoring &amp; Betting Engine
         </p>
+        <Link href="/about" className="text-slate-600 text-[11px] hover:text-emerald-400 transition mt-1">
+          About Tee2Green →
+        </Link>
       </div>
 
       {/* Resume card */}

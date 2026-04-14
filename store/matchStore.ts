@@ -24,6 +24,13 @@ export interface PlayerDraft {
   handicapIndex: number;
 }
 
+export interface ManualCourseDetails {
+  name: string;
+  par: number;
+  courseRating: number;
+  slopeRating: number;
+}
+
 export interface SetupState {
   step: 1 | 2 | 3 | 4 | 5;
   playerCount: number;
@@ -31,6 +38,8 @@ export interface SetupState {
   enableHandicaps: boolean;
   selectedCourse: APICourse | null;
   selectedTee: APITee | null;
+  /** Manually entered course details (used when no API course is selected). */
+  manualCourse: ManualCourseDetails | null;
   selectedGame: GolfGameDefinition | null;
   /** Chosen format combination (only required when game has multiple supportedFormats). */
   selectedFormat: GameFormat | null;
@@ -78,6 +87,7 @@ interface MatchStore {
   setEnableHandicaps: (enabled: boolean) => void;
   selectCourse: (course: APICourse, tee: APITee) => void;
   clearCourse: () => void;
+  setManualCourse: (details: ManualCourseDetails | null) => void;
   selectGame: (game: GolfGameDefinition) => void;
   selectFormat: (format: GameFormat) => void;
   updateBetting: (partial: Partial<BettingConfig>) => void;
@@ -145,6 +155,7 @@ export const useMatchStore = create<MatchStore>()(
             enableHandicaps: false,
             selectedCourse: null,
             selectedTee: null,
+            manualCourse: null,
             selectedGame: null,
             selectedFormat: null,
             betting: { ...defaultBetting },
@@ -179,7 +190,13 @@ export const useMatchStore = create<MatchStore>()(
       clearCourse: () => {
         const { setup } = get();
         if (!setup) return;
-        set({ setup: { ...setup, selectedCourse: null, selectedTee: null } });
+        set({ setup: { ...setup, selectedCourse: null, selectedTee: null, manualCourse: null } });
+      },
+
+      setManualCourse: (details) => {
+        const { setup } = get();
+        if (!setup) return;
+        set({ setup: { ...setup, manualCourse: details } });
       },
 
       selectGame: (game) => {
@@ -212,6 +229,15 @@ export const useMatchStore = create<MatchStore>()(
         const course =
           setup.selectedCourse && setup.selectedTee
             ? adaptCourseForRound(setup.selectedCourse, setup.selectedTee)
+            : setup.manualCourse
+            ? {
+                ...mockCourse,
+                id: "manual-course",
+                name: setup.manualCourse.name || "Manual Course",
+                par: setup.manualCourse.par || mockCourse.par,
+                slopeRating: setup.manualCourse.slopeRating || mockCourse.slopeRating,
+                courseRating: setup.manualCourse.courseRating || mockCourse.courseRating,
+              }
             : mockCourse;
         const courseHoles: Hole[] = course.holes.map((h) => ({ ...h }));
 
