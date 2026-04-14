@@ -27,22 +27,32 @@ function toParColor(n: number): string {
   return "text-red-500";
 }
 
-function scoreStyle(score: number, par: number): string {
+// Ring/bg decoration only — no text color. Applied to a fixed-size container.
+// Two-ring effects use double box-shadow: inner ring at 1px, gap, outer ring at 3px.
+function scoreRing(score: number, par: number): string {
   const d = score - par;
-  // Ace or Albatross (≥3 under) — filled green circle
-  if (score === 1 || d <= -3) return "rounded-full bg-emerald-500 text-black";
-  // Eagle (2 under) — green, double-weight ring circle
-  if (d === -2) return "rounded-full ring-2 ring-emerald-400 text-emerald-400";
-  // Birdie (1 under) — blue, single ring circle
-  if (d === -1) return "rounded-full ring-1 ring-sky-400 text-sky-400";
-  // Par — no decoration
-  if (d === 0) return "text-slate-300";
-  // Bogey (1 over) — orange, single square ring
-  if (d === 1) return "rounded ring-1 ring-orange-400 text-orange-400";
-  // Double bogey (2 over) — red, double square ring
-  if (d === 2) return "rounded ring-2 ring-red-500 text-red-400";
-  // Triple bogey or worse — filled red square
-  return "rounded bg-red-700 text-white";
+  if (score === 1 || d <= -3) return "rounded-full bg-emerald-500";                                     // Ace/Albatross — filled green
+  if (d === -2) return "rounded-full shadow-[0_0_0_1.5px_#34d399,0_0_0_3.5px_#34d399]";               // Eagle — 2 circle rings
+  if (d === -1) return "rounded-full shadow-[0_0_0_2px_#38bdf8]";                                       // Birdie — 1 circle ring
+  if (d === 0)  return "";                                                                               // Par — plain
+  if (d === 1)  return "rounded shadow-[0_0_0_2px_#fb923c]";                                            // Bogey — 1 square ring
+  if (d === 2)  return "rounded shadow-[0_0_0_1.5px_#ef4444,0_0_0_3.5px_#ef4444]";                    // Double — 2 square rings
+  return "rounded bg-red-700";                                                                           // Triple+ — filled red
+}
+
+// Full style for scorecard cells: ring + text color
+function scoreStyle(score: number, par: number): string {
+  const ring = scoreRing(score, par);
+  const d = score - par;
+  let text: string;
+  if (score === 1 || d <= -3) text = "text-black";
+  else if (d === -2)          text = "text-emerald-400";
+  else if (d === -1)          text = "text-sky-400";
+  else if (d === 0)           text = "text-slate-300";
+  else if (d === 1)           text = "text-orange-400";
+  else if (d === 2)           text = "text-red-400";
+  else                        text = "text-white";
+  return ring ? `${ring} ${text}` : text;
 }
 
 function scoreLabel(score: number, par: number): string {
@@ -350,7 +360,6 @@ function ScoreButtons({
     <div className="grid grid-cols-5 gap-2 mt-3">
       {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => {
         const isSelected = selected === n;
-        const shape = scoreStyle(n, hole.par);
         const label = scoreLabel(n, hole.par);
         return (
           <button
@@ -358,13 +367,19 @@ function ScoreButtons({
             onClick={() => onSelect(n)}
             className={`flex flex-col items-center justify-center h-14 rounded-xl font-bold transition-all active:scale-90 ${
               isSelected
-                ? "bg-emerald-500/20 ring-1 ring-emerald-400 text-emerald-400 scale-[1.06]"
-                : "bg-white/[0.04] text-slate-400 hover:bg-white/[0.08]"
+                ? "bg-emerald-500/20 ring-1 ring-emerald-400 scale-[1.06]"
+                : "bg-white/[0.04] hover:bg-white/[0.08]"
             }`}
           >
-            <span className={`text-base leading-none ${!isSelected ? shape : ""}`}>{n}</span>
+            <span
+              className={`w-8 h-8 inline-flex items-center justify-center text-sm font-bold text-white ${
+                !isSelected ? scoreRing(n, hole.par) : ""
+              }`}
+            >
+              {n}
+            </span>
             {isSelected && (
-              <span className="text-[8px] mt-1 font-semibold tracking-wide leading-none text-emerald-400/70 uppercase">
+              <span className="text-[8px] font-semibold tracking-wide leading-none text-emerald-400/70 uppercase">
                 {label}
               </span>
             )}
