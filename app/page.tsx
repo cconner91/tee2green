@@ -4,17 +4,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useMatchStore, ActiveRound } from "@/store/matchStore";
 
-// ─── Logo icon ────────────────────────────────────────────────────────────────
-
-function LogoIcon() {
-  return (
-    <svg width="38" height="38" viewBox="0 0 38 38" fill="none">
-      <line x1="15" y1="5" x2="15" y2="33" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" />
-      <path d="M15 5 L28 11 L15 17 Z" fill="#10b981" />
-      <ellipse cx="15" cy="33" rx="8" ry="2.4" fill="#10b981" fillOpacity="0.25" />
-    </svg>
-  );
-}
 
 // ─── Resume card ──────────────────────────────────────────────────────────────
 
@@ -109,7 +98,7 @@ function NavButton({
         <div className="flex-1 min-w-0">
           <div className="font-semibold text-sm text-white">{title}</div>
           {subtitle && (
-            <p className="text-slate-500 text-xs mt-0.5 leading-snug">{subtitle}</p>
+            <p className="text-slate-500 text-xs mt-2 leading-snug">{subtitle}</p>
           )}
         </div>
         <svg
@@ -137,36 +126,14 @@ export default function Home() {
   const hasRound = mounted && round && !round.isComplete;
 
   return (
-    <div className="max-w-md mx-auto px-5 pt-6 pb-10 space-y-6">
+    <div className="max-w-md mx-auto px-5 pt-0 pb-10 space-y-3">
 
       {/* Hero */}
-      <div className="flex flex-col items-center text-center pt-4 pb-2 space-y-5">
-        <div
-          className="w-[76px] h-[76px] rounded-[22px] flex items-center justify-center"
-          style={{
-            background: "linear-gradient(145deg, rgba(16,185,129,0.18) 0%, rgba(5,150,105,0.07) 100%)",
-            boxShadow: "0 0 0 1px rgba(16,185,129,0.22) inset, 0 8px 32px rgba(16,185,129,0.18)",
-          }}
-        >
-          <LogoIcon />
-        </div>
-
-        <div className="space-y-2">
-          <h1
-            className="text-[2.8rem] leading-none font-black tracking-[-0.02em]"
-            style={{
-              background: "linear-gradient(140deg, #ffffff 10%, #6ee7b7 52%, #ffffff 90%)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              backgroundClip: "text",
-            }}
-          >
-            TEE2GREEN
-          </h1>
-          <p className="text-slate-400 text-[13px] font-medium leading-snug tracking-wide">
-            The Ultimate Golf Scoring &amp; Betting Engine
-          </p>
-        </div>
+      <div className="flex flex-col items-center text-center pt-1">
+        <img src="/tee2green_logo.png" alt="Tee2Green" className="h-60 w-auto" />
+        <p className="text-slate-400 text-[13px] font-medium leading-snug tracking-wide -mt-3">
+          The Ultimate Golf Scoring &amp; Betting Engine
+        </p>
       </div>
 
       {/* Resume card */}

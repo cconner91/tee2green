@@ -98,11 +98,8 @@ export default function NavShell({ children }: { children: React.ReactNode }) {
         {/* Left spacer / back context handled per-page */}
         <div className="w-10" />
 
-        <Link
-          href="/"
-          className="font-black tracking-tight text-sm text-white hover:text-emerald-400 transition-colors"
-        >
-          TEE2GREEN
+        <Link href="/" className="flex items-center">
+          <img src="/tee2green_logo.png" alt="Tee2Green" className="h-25 w-auto" />
         </Link>
 
         <Link

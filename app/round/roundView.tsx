@@ -401,9 +401,9 @@ function ScorecardStrip({ round }: { round: ActiveRound }) {
 
   return (
     <div className="overflow-x-auto -mx-4 px-4">
-      <div className="bg-[#0d0d0d] border border-white/[0.05] rounded-xl overflow-hidden" style={{ minWidth: 340 }}>
+      <div className="bg-[#0d0d0d] border border-white/[0.05] rounded-xl overflow-hidden" style={{ minWidth: 380 }}>
         <div className="flex border-b border-white/[0.06]">
-          <div className="w-12 shrink-0 px-2 py-2 text-[9px] uppercase tracking-widest text-slate-700 font-semibold">HOLE</div>
+          <div className="w-20 shrink-0 px-2 py-2 text-[9px] uppercase tracking-widest text-slate-700 font-semibold">HOLE</div>
           {holes.map((h) => (
             <div key={h.number} className={`flex-1 text-center py-2 text-[11px] font-bold ${h.number === current ? "text-white bg-white/[0.07]" : "text-slate-600"}`}>
               {h.number}
@@ -413,7 +413,7 @@ function ScorecardStrip({ round }: { round: ActiveRound }) {
         </div>
 
         <div className="flex border-b border-white/[0.04]">
-          <div className="w-12 shrink-0 px-2 py-1 text-[9px] uppercase tracking-widest text-slate-800 font-semibold">HCP</div>
+          <div className="w-20 shrink-0 px-2 py-1 text-[9px] uppercase tracking-widest text-slate-800 font-semibold">HCP</div>
           {holes.map((h) => (
             <div key={h.number} className={`flex-1 text-center py-1 text-[9px] text-slate-800 ${h.number === current ? "bg-white/[0.07]" : ""}`}>
               {h.strokeIndex}
@@ -423,7 +423,7 @@ function ScorecardStrip({ round }: { round: ActiveRound }) {
         </div>
 
         <div className="flex border-b border-white/[0.06]">
-          <div className="w-12 shrink-0 px-2 py-1.5 text-[9px] uppercase tracking-widest text-slate-600 font-semibold">PAR</div>
+          <div className="w-20 shrink-0 px-2 py-1.5 text-[9px] uppercase tracking-widest text-slate-600 font-semibold">PAR</div>
           {holes.map((h) => (
             <div key={h.number} className={`flex-1 text-center py-1.5 text-[10px] font-semibold text-slate-600 ${h.number === current ? "bg-white/[0.07]" : ""}`}>
               {h.par}
@@ -439,8 +439,8 @@ function ScorecardStrip({ round }: { round: ActiveRound }) {
           }, 0);
           return (
             <div key={player.id} className={`flex ${pi < round.players.length - 1 ? "border-b border-white/[0.04]" : ""}`}>
-              <div className="w-12 shrink-0 px-2 py-2 text-[10px] text-slate-400 font-semibold truncate">
-                {player.name.slice(0, 5) || `P${pi + 1}`}
+              <div className="w-20 shrink-0 px-2 py-2 text-[10px] text-slate-400 font-semibold truncate">
+                {player.name.slice(0, 8) || `P${pi + 1}`}
               </div>
               {holes.map((h) => {
                 const result = round.holeResults.find((r) => r.holeNumber === h.number);
@@ -495,9 +495,9 @@ function ScorecardView({ round }: { round: ActiveRound }) {
       </div>
 
       <div className="flex-1 overflow-x-auto overflow-y-auto px-4 pb-[env(safe-area-inset-bottom,16px)]">
-        <div className="bg-[#0d0d0d] border border-white/[0.06] rounded-xl overflow-hidden" style={{ minWidth: 360 }}>
+        <div className="bg-[#0d0d0d] border border-white/[0.06] rounded-xl overflow-hidden" style={{ minWidth: 380 }}>
           <div className="flex border-b border-white/[0.07]">
-            <div className="w-16 shrink-0 px-3 py-2.5 text-[9px] uppercase tracking-widest text-slate-700 font-semibold">HOLE</div>
+            <div className="w-20 shrink-0 px-3 py-2.5 text-[9px] uppercase tracking-widest text-slate-700 font-semibold">HOLE</div>
             {holes.map((h) => (
               <div key={h.number} className="flex-1 text-center py-2.5 text-xs font-bold text-slate-400">
                 {h.number}
@@ -507,7 +507,7 @@ function ScorecardView({ round }: { round: ActiveRound }) {
           </div>
 
           <div className="flex border-b border-white/[0.04]">
-            <div className="w-16 shrink-0 px-3 py-1.5 text-[9px] uppercase tracking-widest text-slate-800 font-semibold">YDS</div>
+            <div className="w-20 shrink-0 px-3 py-1.5 text-[9px] uppercase tracking-widest text-slate-800 font-semibold">YDS</div>
             {holes.map((h) => (
               <div key={h.number} className="flex-1 text-center py-1.5 text-[9px] text-slate-800">—</div>
             ))}
@@ -515,7 +515,7 @@ function ScorecardView({ round }: { round: ActiveRound }) {
           </div>
 
           <div className="flex border-b border-white/[0.04]">
-            <div className="w-16 shrink-0 px-3 py-1.5 text-[9px] uppercase tracking-widest text-slate-700 font-semibold">HCP</div>
+            <div className="w-20 shrink-0 px-3 py-1.5 text-[9px] uppercase tracking-widest text-slate-700 font-semibold">HCP</div>
             {holes.map((h) => (
               <div key={h.number} className="flex-1 text-center py-1.5 text-[9px] text-slate-700">{h.strokeIndex}</div>
             ))}
@@ -523,7 +523,7 @@ function ScorecardView({ round }: { round: ActiveRound }) {
           </div>
 
           <div className="flex border-b border-white/[0.08]">
-            <div className="w-16 shrink-0 px-3 py-2 text-[9px] uppercase tracking-widest text-slate-500 font-semibold">PAR</div>
+            <div className="w-20 shrink-0 px-3 py-2 text-[9px] uppercase tracking-widest text-slate-500 font-semibold">PAR</div>
             {holes.map((h) => (
               <div key={h.number} className="flex-1 text-center py-2 text-xs font-bold text-slate-400">
                 {h.par}
@@ -542,7 +542,7 @@ function ScorecardView({ round }: { round: ActiveRound }) {
             const toPar = total > 0 ? total - parPlayed : null;
             return (
               <div key={player.id} className={`flex ${pi < round.players.length - 1 ? "border-b border-white/[0.05]" : ""}`}>
-                <div className="w-16 shrink-0 px-3 py-3 text-xs font-semibold text-slate-200 truncate">
+                <div className="w-20 shrink-0 px-3 py-3 text-xs font-semibold text-slate-200 truncate">
                   {player.name}
                 </div>
                 {holes.map((h) => {
@@ -832,85 +832,88 @@ function HoleView({
   }
 
   return (
-    <div className="flex-1 flex flex-col gap-3 px-4 pt-4 pb-2 overflow-y-auto">
-      {/* Hole header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="text-4xl font-black tracking-tight leading-none">
-            {round.currentHole}
-            <span className="text-slate-600 text-xl font-semibold ml-1.5">/ {round.courseHoles.length}</span>
+    <div className="flex-1 flex flex-col overflow-hidden">
+      {/* Scrollable content */}
+      <div className="flex-1 flex flex-col gap-3 px-4 pt-4 pb-2 overflow-y-auto">
+        {/* Hole header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="text-4xl font-black tracking-tight leading-none">
+              {round.currentHole}
+              <span className="text-slate-600 text-xl font-semibold ml-1.5">/ {round.courseHoles.length}</span>
+            </div>
+            <div className="text-slate-500 text-xs mt-1.5 flex items-center gap-1.5">
+              <span>SI {hole.strokeIndex}</span>
+              {round.course.name && (
+                <>
+                  <span className="text-slate-700">·</span>
+                  <span className="truncate max-w-[140px]">{round.course.name}</span>
+                </>
+              )}
+            </div>
           </div>
-          <div className="text-slate-500 text-xs mt-1.5 flex items-center gap-1.5">
-            <span>SI {hole.strokeIndex}</span>
-            {round.course.name && (
-              <>
-                <span className="text-slate-700">·</span>
-                <span className="truncate max-w-[140px]">{round.course.name}</span>
-              </>
-            )}
+          <div className="text-right">
+            <div className="text-[10px] uppercase tracking-widest text-slate-600 mb-1.5">Par</div>
+            <ParSelector hole={hole} onChange={(p) => setHolePar(hole.number, p)} />
           </div>
         </div>
-        <div className="text-right">
-          <div className="text-[10px] uppercase tracking-widest text-slate-600 mb-1.5">Par</div>
-          <ParSelector hole={hole} onChange={(p) => setHolePar(hole.number, p)} />
-        </div>
+
+        {/* Mini scorecard */}
+        <ScorecardStrip round={round} />
+
+        {/* Player cards */}
+        {round.players.map((player) => {
+          const ps: PlayerSummary | undefined = psMap[player.id];
+          const isLeader = leaderIds.has(player.id) && summary.holesPlayed > 0;
+
+          const ph = round.playingHandicaps[player.id] ?? 0;
+          const strokesThisHole =
+            round.enableHandicaps && ph > 0
+              ? Math.floor(ph / 18) + (hole.strokeIndex <= (ph % 18) ? 1 : 0)
+              : 0;
+
+          return (
+            <div
+              key={player.id}
+              className={`rounded-2xl p-4 border transition ${
+                isLeader
+                  ? "bg-emerald-500/[0.06] border-emerald-500/30 shadow-[0_0_20px_rgba(16,185,129,0.08)]"
+                  : "bg-slate-900/60 border-slate-700/40"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-sm">{player.name}</span>
+                  {strokesThisHole > 0 && (
+                    <span className="text-sky-400 text-[10px] font-semibold bg-sky-400/10 px-1.5 py-0.5 rounded-md">
+                      +{strokesThisHole}
+                    </span>
+                  )}
+                </div>
+                <div className="text-right">
+                  {ps && ps.holesPlayed > 0 ? (
+                    <span className={`text-2xl font-black tabular-nums ${toParColor(ps.netToPar)}`}>
+                      {ps.stablefordPoints !== undefined
+                        ? `${ps.stablefordPoints}pts`
+                        : formatToPar(ps.netToPar)}
+                    </span>
+                  ) : (
+                    <span className="text-slate-700 text-2xl font-black">—</span>
+                  )}
+                </div>
+              </div>
+              <ScoreButtons
+                hole={hole}
+                selected={grossScores[player.id] ?? null}
+                onSelect={(n) => setScore(player.id, n)}
+              />
+            </div>
+          );
+        })}
       </div>
 
-      {/* Mini scorecard */}
-      <ScorecardStrip round={round} />
-
-      {/* Player cards */}
-      {round.players.map((player) => {
-        const ps: PlayerSummary | undefined = psMap[player.id];
-        const isLeader = leaderIds.has(player.id) && summary.holesPlayed > 0;
-
-        const ph = round.playingHandicaps[player.id] ?? 0;
-        const strokesThisHole =
-          round.enableHandicaps && ph > 0
-            ? Math.floor(ph / 18) + (hole.strokeIndex <= (ph % 18) ? 1 : 0)
-            : 0;
-
-        return (
-          <div
-            key={player.id}
-            className={`rounded-2xl p-4 border transition ${
-              isLeader
-                ? "bg-emerald-500/[0.06] border-emerald-500/30 shadow-[0_0_20px_rgba(16,185,129,0.08)]"
-                : "bg-slate-900/60 border-slate-700/40"
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-sm">{player.name}</span>
-                {strokesThisHole > 0 && (
-                  <span className="text-sky-400 text-[10px] font-semibold bg-sky-400/10 px-1.5 py-0.5 rounded-md">
-                    +{strokesThisHole}
-                  </span>
-                )}
-              </div>
-              <div className="text-right">
-                {ps && ps.holesPlayed > 0 ? (
-                  <span className={`text-2xl font-black tabular-nums ${toParColor(ps.netToPar)}`}>
-                    {ps.stablefordPoints !== undefined
-                      ? `${ps.stablefordPoints}pts`
-                      : formatToPar(ps.netToPar)}
-                  </span>
-                ) : (
-                  <span className="text-slate-700 text-2xl font-black">—</span>
-                )}
-              </div>
-            </div>
-            <ScoreButtons
-              hole={hole}
-              selected={grossScores[player.id] ?? null}
-              onSelect={(n) => setScore(player.id, n)}
-            />
-          </div>
-        );
-      })}
-
-      {/* Submit + undo */}
-      <div className="pb-[env(safe-area-inset-bottom,8px)] space-y-1">
+      {/* Submit + undo — sticky at bottom, always visible regardless of player count */}
+      <div className="shrink-0 px-4 pt-2 pb-[env(safe-area-inset-bottom,10px)] space-y-1 border-t border-white/[0.05] bg-[#060d1a]">
         <button
           onClick={onSubmit}
           disabled={!allEntered}
