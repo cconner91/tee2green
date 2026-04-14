@@ -3,7 +3,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 
-import { GolfGameDefinition } from "@/domain/gameConfig/types";
+import { GolfGameDefinition, GameFormat, BettingConfig } from "@/domain/gameConfig/types";
 import { Player, PlayerId } from "@/domain/models/Player";
 import { Hole } from "@/domain/models/Hole";
 import { Course } from "@/domain/models/Course";
@@ -24,14 +24,6 @@ export interface PlayerDraft {
   handicapIndex: number;
 }
 
-export interface BettingConfig {
-  enabled: boolean;
-  /** Base bet per match / per Nassau segment */
-  baseBetAmount: number;
-  /** Value per skin (Skins game only) */
-  skinValue: number;
-}
-
 export interface SetupState {
   step: 1 | 2 | 3 | 4 | 5;
   playerCount: number;
@@ -40,26 +32,37 @@ export interface SetupState {
   selectedCourse: APICourse | null;
   selectedTee: APITee | null;
   selectedGame: GolfGameDefinition | null;
+  /** Chosen format combination (only required when game has multiple supportedFormats). */
+  selectedFormat: GameFormat | null;
   betting: BettingConfig;
 }
 
 // ─── Round types ──────────────────────────────────────────────────────────────
 
+export interface NassauPress {
+  id: string;
+  /** Hole number where this press starts. */
+  startHole: number;
+  /** Dollar amount for this press. */
+  amount: number;
+}
+
 export interface ActiveRound {
   players: Player[];
   game: GolfGameDefinition;
   course: Course;
-  /**
-   * Mutable copy of course holes. Par can be edited per-hole during a round
-   * since we don't have a full course DB — users can correct any hole on the fly.
-   */
   courseHoles: Hole[];
   playingHandicaps: Record<PlayerId, number>;
-  currentHole: number; // 1-18
+  currentHole: number;
   holeResults: HoleResult[];
   isComplete: boolean;
   enableHandicaps: boolean;
   betting: BettingConfig;
+  /** Chosen format for this round (resolved from selectedFormat or game defaults). */
+  gameplayFormat: string;
+  matchupFormat: string;
+  /** Active Nassau presses. Only relevant when betting.structure === "Nassau". */
+  nassauPresses: NassauPress[];
 }
 
 // ─── Store interface ──────────────────────────────────────────────────────────
@@ -76,6 +79,7 @@ interface MatchStore {
   selectCourse: (course: APICourse, tee: APITee) => void;
   clearCourse: () => void;
   selectGame: (game: GolfGameDefinition) => void;
+  selectFormat: (format: GameFormat) => void;
   updateBetting: (partial: Partial<BettingConfig>) => void;
   clearSetup: () => void;
 
@@ -84,6 +88,7 @@ interface MatchStore {
   setHolePar: (holeNumber: number, par: number) => void;
   submitHole: (grossScores: Record<PlayerId, number>) => void;
   undoLastHole: () => void;
+  addNassauPress: () => void;
   abandonRound: () => void;
 }
 
@@ -91,9 +96,31 @@ interface MatchStore {
 
 const defaultBetting: BettingConfig = {
   enabled: false,
-  baseBetAmount: 5,
+  structure: "FullMatch",
+  amount: 5,
   skinValue: 2,
+  nassauAutoPressAt: 0,
 };
+
+// ─── Auto-press helper ────────────────────────────────────────────────────────
+
+function getMatchStanding(
+  results: HoleResult[],
+  idA: PlayerId,
+  idB: PlayerId
+): { holesUp: number; leaderId: PlayerId | null } {
+  let winsA = 0;
+  let winsB = 0;
+  for (const hr of results) {
+    if (hr.winner === idA) winsA++;
+    else if (hr.winner === idB) winsB++;
+  }
+  const diff = winsA - winsB;
+  return {
+    holesUp: Math.abs(diff),
+    leaderId: diff > 0 ? idA : diff < 0 ? idB : null,
+  };
+}
 
 // ─── Store ────────────────────────────────────────────────────────────────────
 
@@ -119,6 +146,7 @@ export const useMatchStore = create<MatchStore>()(
             selectedCourse: null,
             selectedTee: null,
             selectedGame: null,
+            selectedFormat: null,
             betting: { ...defaultBetting },
           },
         });
@@ -157,7 +185,14 @@ export const useMatchStore = create<MatchStore>()(
       selectGame: (game) => {
         const { setup } = get();
         if (!setup) return;
-        set({ setup: { ...setup, selectedGame: game } });
+        // Reset format when game changes
+        set({ setup: { ...setup, selectedGame: game, selectedFormat: null } });
+      },
+
+      selectFormat: (format) => {
+        const { setup } = get();
+        if (!setup) return;
+        set({ setup: { ...setup, selectedFormat: format } });
       },
 
       updateBetting: (partial) => {
@@ -178,7 +213,6 @@ export const useMatchStore = create<MatchStore>()(
           setup.selectedCourse && setup.selectedTee
             ? adaptCourseForRound(setup.selectedCourse, setup.selectedTee)
             : mockCourse;
-        // Deep copy holes so par edits during the round don't mutate the source
         const courseHoles: Hole[] = course.holes.map((h) => ({ ...h }));
 
         const players: Player[] = setup.players
@@ -204,6 +238,18 @@ export const useMatchStore = create<MatchStore>()(
           }
         });
 
+        // Resolve gameplay / matchup format
+        const resolvedGameplayFormat =
+          setup.selectedFormat?.gameplayFormat ?? setup.selectedGame.gameplayFormat;
+        const resolvedMatchupFormat =
+          setup.selectedFormat?.matchupFormat ?? setup.selectedGame.matchupFormat;
+
+        // For Nassau game, force Nassau betting structure
+        const resolvedBetting: BettingConfig =
+          setup.selectedGame.id === "nassau"
+            ? { ...setup.betting, structure: "Nassau" }
+            : setup.betting;
+
         set({
           round: {
             players,
@@ -215,7 +261,10 @@ export const useMatchStore = create<MatchStore>()(
             holeResults: [],
             isComplete: false,
             enableHandicaps: setup.enableHandicaps,
-            betting: { ...setup.betting },
+            betting: resolvedBetting,
+            gameplayFormat: resolvedGameplayFormat,
+            matchupFormat: resolvedMatchupFormat,
+            nassauPresses: [],
           },
           setup: null,
         });
@@ -234,7 +283,6 @@ export const useMatchStore = create<MatchStore>()(
         const { round } = get();
         if (!round || round.isComplete) return;
 
-        // Use the mutable courseHoles so any par edit is reflected
         const holeData = round.courseHoles[round.currentHole - 1];
         const result = evaluateHole(holeData, grossScores, round.playingHandicaps);
 
@@ -242,10 +290,35 @@ export const useMatchStore = create<MatchStore>()(
         const nextHole = round.currentHole + 1;
         const isComplete = nextHole > round.courseHoles.length;
 
+        // ── Auto-press check for Nassau ────────────────────────────────────
+        let newPresses = [...round.nassauPresses];
+        if (
+          round.betting.enabled &&
+          round.betting.structure === "Nassau" &&
+          round.betting.nassauAutoPressAt > 0 &&
+          !isComplete &&
+          round.players.length === 2
+        ) {
+          const [idA, idB] = round.players.map((p) => p.id);
+          const standing = getMatchStanding(newResults, idA, idB);
+          // Press at the start of the NEXT hole if no press already starts there
+          if (
+            standing.holesUp >= round.betting.nassauAutoPressAt &&
+            !newPresses.some((p) => p.startHole === nextHole)
+          ) {
+            newPresses.push({
+              id: `press-${Date.now()}`,
+              startHole: nextHole,
+              amount: round.betting.amount,
+            });
+          }
+        }
+
         set({
           round: {
             ...round,
             holeResults: newResults,
+            nassauPresses: newPresses,
             currentHole: isComplete ? round.currentHole : nextHole,
             isComplete,
           },
@@ -261,12 +334,42 @@ export const useMatchStore = create<MatchStore>()(
           ? round.currentHole
           : round.currentHole - 1;
 
+        // Remove any presses that started at or after the hole we're undoing
+        const removedHole = round.isComplete ? round.currentHole : round.currentHole - 1;
+        const newPresses = round.nassauPresses.filter(
+          (p) => p.startHole < removedHole
+        );
+
         set({
           round: {
             ...round,
             holeResults: newResults,
+            nassauPresses: newPresses,
             currentHole: Math.max(1, prevHole),
             isComplete: false,
+          },
+        });
+      },
+
+      addNassauPress: () => {
+        const { round } = get();
+        if (!round) return;
+        if (!round.betting.enabled || round.betting.structure !== "Nassau") return;
+        if (round.isComplete) return;
+        // Don't double-press the same hole
+        if (round.nassauPresses.some((p) => p.startHole === round.currentHole)) return;
+
+        set({
+          round: {
+            ...round,
+            nassauPresses: [
+              ...round.nassauPresses,
+              {
+                id: `press-${Date.now()}`,
+                startHole: round.currentHole,
+                amount: round.betting.amount,
+              },
+            ],
           },
         });
       },
@@ -274,19 +377,38 @@ export const useMatchStore = create<MatchStore>()(
       abandonRound: () => set({ round: null }),
     }),
     {
-      name: "tee2green-match-v2",
+      name: "tee2green-match-v3",
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({ round: state.round }),
-      // v2: ActiveRound gained courseHoles — old persisted state is incompatible
+      version: 3,
       migrate: (persisted: unknown) => {
         const state = persisted as { round?: ActiveRound | null };
-        if (state?.round && !state.round.courseHoles) {
-          // Patch missing field from the static course data
-          state.round.courseHoles = state.round.course.holes.map((h) => ({ ...h }));
+        if (state?.round) {
+          // Patch: courseHoles (v2 migration)
+          if (!state.round.courseHoles) {
+            state.round.courseHoles = state.round.course.holes.map((h) => ({ ...h }));
+          }
+          // Patch: nassauPresses (v3)
+          if (!state.round.nassauPresses) {
+            state.round.nassauPresses = [];
+          }
+          // Patch: gameplayFormat / matchupFormat (v3)
+          if (!state.round.gameplayFormat) {
+            state.round.gameplayFormat = state.round.game.gameplayFormat;
+          }
+          if (!state.round.matchupFormat) {
+            state.round.matchupFormat = state.round.game.matchupFormat;
+          }
+          // Patch: BettingConfig shape (v3 renames baseBetAmount → amount, adds structure)
+          const b = state.round.betting as unknown as Record<string, unknown>;
+          if (b && !b.structure) {
+            b.structure = "FullMatch";
+            b.amount = (b.baseBetAmount as number | undefined) ?? 5;
+            b.nassauAutoPressAt = 0;
+          }
         }
         return state;
       },
-      version: 2,
     }
   )
 );

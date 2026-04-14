@@ -1,7 +1,8 @@
 import { HoleResult } from "../core/HoleResult";
 import { Player, PlayerId } from "../models/Player";
-import { GolfGameDefinition, ScoringFormat, BettingMode } from "../gameConfig/types";
+import { GolfGameDefinition, ScoringFormat, BettingMode, BettingConfig } from "../gameConfig/types";
 import { Course } from "../models/Course";
+import { NassauPress } from "@/store/matchStore";
 
 // ─── Player-level ─────────────────────────────────────────────────────────────
 
@@ -10,11 +11,9 @@ export interface PlayerSummary {
   name: string;
   grossTotal: number;
   netTotal: number;
-  /** +/- relative to par for holes played so far */
   grossToPar: number;
   netToPar: number;
   holesPlayed: number;
-  /** Only populated for Stableford games */
   stablefordPoints?: number;
 }
 
@@ -32,10 +31,43 @@ export interface MatchPlaySummary {
 
 // ─── Nassau ───────────────────────────────────────────────────────────────────
 
+export interface NassauPressSummary {
+  id: string;
+  startHole: number;
+  amount: number;
+  /** Match play status for holes startHole → 18 */
+  match: MatchPlaySummary;
+}
+
 export interface NassauSummary {
   front: MatchPlaySummary;
   back: MatchPlaySummary;
   overall: MatchPlaySummary;
+  presses: NassauPressSummary[];
+  /** Current net balance per player across all bets if the round ended now */
+  balance: Record<PlayerId, number>;
+}
+
+// ─── Hole-by-hole ─────────────────────────────────────────────────────────────
+
+export interface HoleByHoleSummary {
+  /** Running net balance per player (positive = won, negative = owed) */
+  balance: Record<PlayerId, number>;
+  history: Array<{
+    holeNumber: number;
+    winner: PlayerId | "TIE";
+    /** How much each player gained/lost on this hole */
+    delta: Record<PlayerId, number>;
+  }>;
+}
+
+// ─── Full match ───────────────────────────────────────────────────────────────
+
+export interface FullMatchSummary {
+  /** Current leader id (if round complete, definitive winner) */
+  leaderId: PlayerId | null;
+  /** Net balance per player: positive = won, negative = owed */
+  balance: Record<PlayerId, number>;
 }
 
 // ─── Skins ────────────────────────────────────────────────────────────────────
@@ -43,7 +75,6 @@ export interface NassauSummary {
 export interface SkinEntry {
   holeNumber: number;
   winner: PlayerId | "CARRY";
-  /** Dollar value of this skin (0 if carry) */
   value: number;
 }
 
@@ -51,7 +82,6 @@ export interface SkinsSummary {
   history: SkinEntry[];
   skinsWon: Record<PlayerId, number>;
   moneyWon: Record<PlayerId, number>;
-  /** Dollar value currently sitting in the pot waiting to be won */
   currentCarryValue: number;
 }
 
@@ -59,10 +89,11 @@ export interface SkinsSummary {
 
 export interface RoundSummary {
   playerSummaries: PlayerSummary[];
-  /** Standard match play status (not populated for Nassau — use nassau instead) */
   matchPlay?: MatchPlaySummary;
   nassau?: NassauSummary;
   skins?: SkinsSummary;
+  holeByHole?: HoleByHoleSummary;
+  fullMatch?: FullMatchSummary;
   holesPlayed: number;
   totalHoles: number;
 }
@@ -78,7 +109,7 @@ function matchStatus(
   if (holesUp === 0) return "All Square";
   const remaining = totalHoles - holesPlayed;
   if (matchOver) return `${holesUp}&${remaining}`;
-  if (holesUp >= remaining && remaining > 0) return `Dormie ${holesUp}`;
+  if (remaining > 0 && holesUp >= remaining) return `Dormie ${holesUp}`;
   return `${holesUp} UP`;
 }
 
@@ -128,7 +159,6 @@ function calcSkins(
   playerIds.forEach((id) => { skinsWon[id] = 0; moneyWon[id] = 0; });
 
   let carry = 0;
-
   for (const hr of results) {
     if (hr.winner === "TIE") {
       carry += skinValue;
@@ -144,12 +174,95 @@ function calcSkins(
     }
   }
 
-  return {
-    history,
-    skinsWon,
-    moneyWon,
-    currentCarryValue: carry,
-  };
+  return { history, skinsWon, moneyWon, currentCarryValue: carry };
+}
+
+function calcHoleByHole(
+  results: HoleResult[],
+  playerIds: PlayerId[],
+  amount: number
+): HoleByHoleSummary {
+  const balance: Record<PlayerId, number> = {};
+  playerIds.forEach((id) => { balance[id] = 0; });
+
+  const history: HoleByHoleSummary["history"] = [];
+
+  for (const hr of results) {
+    const delta: Record<PlayerId, number> = {};
+    playerIds.forEach((id) => { delta[id] = 0; });
+
+    if (hr.winner !== "TIE") {
+      // Winner collects `amount` from each opponent
+      delta[hr.winner] = amount * (playerIds.length - 1);
+      playerIds.forEach((id) => {
+        if (id !== hr.winner) delta[id] = -amount;
+      });
+    }
+
+    playerIds.forEach((id) => { balance[id] += delta[id]; });
+    history.push({ holeNumber: hr.holeNumber, winner: hr.winner, delta });
+  }
+
+  return { balance, history };
+}
+
+function calcFullMatch(
+  playerSummaries: PlayerSummary[],
+  game: GolfGameDefinition,
+  matchPlaySummary: MatchPlaySummary | undefined,
+  amount: number
+): FullMatchSummary {
+  const balance: Record<PlayerId, number> = {};
+  playerSummaries.forEach((ps) => { balance[ps.id] = 0; });
+
+  let leaderId: PlayerId | null = null;
+
+  if (game.scoringFormat === ScoringFormat.MatchPlay && matchPlaySummary) {
+    // Use hole-count winner
+    leaderId = matchPlaySummary.leaderId;
+  } else {
+    // Stroke play: lowest net score wins
+    const sorted = [...playerSummaries].sort((a, b) => a.netToPar - b.netToPar);
+    if (sorted.length > 1 && sorted[0].netToPar < sorted[1].netToPar) {
+      leaderId = sorted[0].id;
+    }
+  }
+
+  if (leaderId) {
+    balance[leaderId] = amount * (playerSummaries.length - 1);
+    playerSummaries.forEach((ps) => {
+      if (ps.id !== leaderId) balance[ps.id] = -amount;
+    });
+  }
+
+  return { leaderId, balance };
+}
+
+function calcNassauBalance(
+  front: MatchPlaySummary,
+  back: MatchPlaySummary,
+  overall: MatchPlaySummary,
+  presses: NassauPressSummary[],
+  amount: number,
+  playerIds: PlayerId[]
+): Record<PlayerId, number> {
+  const balance: Record<PlayerId, number> = {};
+  playerIds.forEach((id) => { balance[id] = 0; });
+
+  function applyBet(mp: MatchPlaySummary, betAmount: number) {
+    if (!mp.leaderId) return; // All square — no money
+    balance[mp.leaderId] = (balance[mp.leaderId] ?? 0) + betAmount;
+    if (mp.trailerId) {
+      balance[mp.trailerId] = (balance[mp.trailerId] ?? 0) - betAmount;
+    }
+  }
+
+  applyBet(front, amount);
+  applyBet(back, amount);
+  applyBet(overall, amount);
+  presses.forEach((p) => applyBet(p.match, p.amount));
+
+  return balance;
 }
 
 // ─── Main export ──────────────────────────────────────────────────────────────
@@ -159,7 +272,8 @@ export function calculateRoundSummary(
   players: Player[],
   game: GolfGameDefinition,
   course: Course,
-  skinValue = 1
+  betting: BettingConfig,
+  nassauPresses: NassauPress[] = []
 ): RoundSummary {
   const holesPlayed = holeResults.length;
   const totalHoles = course.holes.length;
@@ -169,8 +283,8 @@ export function calculateRoundSummary(
   const playerSummaries: PlayerSummary[] = players.map((player) => {
     const played = holeResults.filter((hr) => player.id in hr.grossScores);
     const grossTotal = played.reduce((s, hr) => s + hr.grossScores[player.id], 0);
-    const netTotal = played.reduce((s, hr) => s + hr.netScores[player.id], 0);
-    const parPlayed = played.reduce((s, hr) => s + hr.par, 0);
+    const netTotal   = played.reduce((s, hr) => s + hr.netScores[player.id], 0);
+    const parPlayed  = played.reduce((s, hr) => s + hr.par, 0);
 
     let stablefordPoints: number | undefined;
     if (game.scoringFormat === ScoringFormat.PointsBased) {
@@ -182,7 +296,7 @@ export function calculateRoundSummary(
         if (diff === 0)  return s + 2;
         if (diff === -1) return s + 3;
         if (diff === -2) return s + 4;
-        return s + 5; // albatross or better
+        return s + 5;
       }, 0);
     }
 
@@ -199,32 +313,73 @@ export function calculateRoundSummary(
   });
 
   // ── Match Play ─────────────────────────────────────────────────────────────
-  const isMatchPlay =
-    game.scoringFormat === ScoringFormat.MatchPlay ||
-    game.bettingMode === BettingMode.Nassau;
+  const isMatchPlayGame = game.scoringFormat === ScoringFormat.MatchPlay;
+  const isNassauGame    = game.bettingMode === BettingMode.Nassau;
+  const isNassauBet     = betting.enabled && betting.structure === "Nassau";
 
   const matchPlay =
-    isMatchPlay && game.bettingMode !== BettingMode.Nassau
+    isMatchPlayGame && !isNassauGame && !isNassauBet && playerIds.length >= 2
       ? calcMatchPlay(holeResults, playerIds, holesPlayed, totalHoles)
       : undefined;
 
   // ── Nassau ─────────────────────────────────────────────────────────────────
   let nassau: NassauSummary | undefined;
-  if (game.bettingMode === BettingMode.Nassau) {
-    const front = holeResults.filter((hr) => hr.holeNumber <= 9);
-    const back  = holeResults.filter((hr) => hr.holeNumber >= 10);
+  if ((isNassauGame || isNassauBet) && playerIds.length >= 2) {
+    const front   = holeResults.filter((hr) => hr.holeNumber <= 9);
+    const back    = holeResults.filter((hr) => hr.holeNumber >= 10);
+    const frontMP = calcMatchPlay(front, playerIds, front.length, 9);
+    const backMP  = calcMatchPlay(back,  playerIds, back.length,  9);
+    const overall = calcMatchPlay(holeResults, playerIds, holesPlayed, totalHoles);
+
+    const presses: NassauPressSummary[] = nassauPresses.map((p) => {
+      const pressResults = holeResults.filter((hr) => hr.holeNumber >= p.startHole);
+      const holesInPress = totalHoles - p.startHole + 1;
+      return {
+        id: p.id,
+        startHole: p.startHole,
+        amount: p.amount,
+        match: calcMatchPlay(pressResults, playerIds, pressResults.length, holesInPress),
+      };
+    });
+
+    const segmentAmount = isNassauGame ? betting.amount : betting.amount;
+    const balance = calcNassauBalance(frontMP, backMP, overall, presses, segmentAmount, playerIds);
+
     nassau = {
-      front:   calcMatchPlay(front, playerIds, front.length, 9),
-      back:    calcMatchPlay(back,  playerIds, back.length,  9),
-      overall: calcMatchPlay(holeResults, playerIds, holesPlayed, totalHoles),
+      front: frontMP,
+      back:  backMP,
+      overall,
+      presses,
+      balance,
     };
   }
 
   // ── Skins ──────────────────────────────────────────────────────────────────
   const skins =
     game.bettingMode === BettingMode.Skins
-      ? calcSkins(holeResults, playerIds, skinValue)
+      ? calcSkins(holeResults, playerIds, betting.skinValue)
       : undefined;
 
-  return { playerSummaries, matchPlay, nassau, skins, holesPlayed, totalHoles };
+  // ── Hole-by-hole ───────────────────────────────────────────────────────────
+  const holeByHole =
+    betting.enabled && betting.structure === "HoleByHole" && playerIds.length >= 2
+      ? calcHoleByHole(holeResults, playerIds, betting.amount)
+      : undefined;
+
+  // ── Full match ─────────────────────────────────────────────────────────────
+  const fullMatch =
+    betting.enabled && betting.structure === "FullMatch" && playerIds.length >= 2
+      ? calcFullMatch(playerSummaries, game, matchPlay, betting.amount)
+      : undefined;
+
+  return {
+    playerSummaries,
+    matchPlay,
+    nassau,
+    skins,
+    holeByHole,
+    fullMatch,
+    holesPlayed,
+    totalHoles,
+  };
 }

@@ -4,13 +4,20 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMatchStore, SetupState } from "@/store/matchStore";
 import { useGameLibraryStore } from "@/store/gameLibraryStore";
-import { GolfGameDefinition, BettingMode, ScoringFormat } from "@/domain/gameConfig/types";
+import {
+  GolfGameDefinition,
+  BettingMode,
+  BettingStructure,
+} from "@/domain/gameConfig/types";
 import { gameDefinitions } from "@/domain/gameConfig/definitions";
-import { getGamesForPlayerCount } from "@/domain/gameConfig/filters";
+import {
+  getGamesForPlayerCount,
+  getFormatsForPlayerCount,
+} from "@/domain/gameConfig/filters";
 import { APICourse, APITee, getTeeName } from "@/domain/course/types";
 import { searchCourses, getCourseById } from "@/domain/course/CourseService";
 
-// ─── Shared ───────────────────────────────────────────────────────────────────
+// ─── Shared helpers ───────────────────────────────────────────────────────────
 
 function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
   return (
@@ -31,8 +38,34 @@ function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="text-[10px] uppercase tracking-widest text-slate-600 mb-2">
+    <div className="text-[10px] uppercase tracking-widest text-slate-500 mb-2">
       {children}
+    </div>
+  );
+}
+
+/** Dollar amount input that always shows the $ prefix and handles empty state cleanly. */
+function AmountInput({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (n: number) => void;
+}) {
+  return (
+    <div className="flex items-center bg-white/[0.04] border border-white/[0.08] rounded-xl overflow-hidden focus-within:border-emerald-500/50 transition">
+      <span className="text-slate-400 text-sm font-semibold pl-4 pr-1 select-none">$</span>
+      <input
+        type="text"
+        inputMode="numeric"
+        value={value === 0 ? "" : String(value)}
+        onChange={(e) => {
+          const raw = e.target.value.replace(/\D/g, "");
+          onChange(raw === "" ? 0 : Math.max(0, parseInt(raw, 10)));
+        }}
+        placeholder="0"
+        className="flex-1 bg-transparent py-3.5 pr-4 text-white font-bold focus:outline-none text-base placeholder-slate-600"
+      />
     </div>
   );
 }
@@ -40,31 +73,39 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 // ─── Step 1: Group size ───────────────────────────────────────────────────────
 
 function StepGroupSize() {
-  const { setup, initSetup } = useMatchStore();
+  const { setup, initSetup, setSetupStep } = useMatchStore();
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold">How many players?</h2>
-        <p className="text-slate-500 text-sm mt-1">
-          The game list will adjust automatically.
+        <h2 className="text-2xl font-bold tracking-tight">How many players?</h2>
+        <p className="text-slate-500 text-sm mt-1.5">
+          Available games adjust automatically.
         </p>
       </div>
-      <div className="grid grid-cols-4 gap-2">
-        {[2, 3, 4, 5, 6, 7, 8].map((n) => (
+      <div className="grid grid-cols-4 gap-2.5">
+        {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
           <button
             key={n}
-            onClick={() => initSetup(n)}
-            className={`py-5 rounded-xl text-2xl font-bold transition active:scale-95 ${
+            onClick={() => {
+              initSetup(n);
+              setSetupStep(2); // auto-advance
+            }}
+            className={`py-5 rounded-2xl text-2xl font-black transition active:scale-95 ${
               setup?.playerCount === n
-                ? "bg-emerald-500 text-black"
-                : "bg-white/[0.06] text-slate-300 hover:bg-white/10"
+                ? "bg-emerald-500 text-black shadow-[0_0_20px_rgba(16,185,129,0.4)]"
+                : "bg-white/[0.05] text-slate-300 hover:bg-white/[0.09] border border-white/[0.07]"
             }`}
           >
             {n}
           </button>
         ))}
       </div>
+      {setup?.playerCount === 1 && (
+        <p className="text-slate-500 text-xs text-center">
+          Solo round — track your score vs par. Betting not available.
+        </p>
+      )}
     </div>
   );
 }
@@ -78,54 +119,61 @@ function StepPlayers() {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="text-xl font-bold">Who&apos;s playing?</h2>
-        <p className="text-slate-500 text-sm mt-1">Names are optional.</p>
+        <h2 className="text-2xl font-bold tracking-tight">Who&apos;s playing?</h2>
+        <p className="text-slate-500 text-sm mt-1.5">Enter names for the scorecard.</p>
       </div>
 
-      {/* Handicap toggle */}
-      <div className="flex items-center justify-between bg-[#111] border border-white/[0.07] rounded-xl px-4 py-3.5">
-        <div>
-          <div className="text-sm font-medium">Use Handicaps</div>
-          <div className="text-slate-500 text-xs mt-0.5">Net scores for fair competition</div>
+      {setup.playerCount > 1 && (
+        <div className="flex items-center justify-between bg-white/[0.04] border border-white/[0.07] rounded-2xl px-4 py-3.5">
+          <div>
+            <div className="text-sm font-semibold">Use Handicaps</div>
+            <div className="text-slate-500 text-xs mt-0.5">Net scores for fair competition</div>
+          </div>
+          <Toggle on={setup.enableHandicaps} onToggle={() => setEnableHandicaps(!setup.enableHandicaps)} />
         </div>
-        <Toggle on={setup.enableHandicaps} onToggle={() => setEnableHandicaps(!setup.enableHandicaps)} />
-      </div>
+      )}
 
-      {/* Player inputs */}
-      <div className="space-y-2">
-        {setup.players.map((player, i) => (
-          <div key={i} className="bg-[#111] border border-white/[0.07] rounded-xl p-4 space-y-2.5">
-            <div className="text-emerald-500 text-[10px] uppercase tracking-widest font-semibold">
-              Player {i + 1}
-            </div>
-            <input
-              value={player.name}
-              onChange={(e) => {
-                const updated = [...setup.players];
-                updated[i] = { ...updated[i], name: e.target.value };
-                updatePlayers(updated);
-              }}
-              placeholder={`Player ${i + 1}`}
-              className="w-full bg-white/[0.05] border border-white/[0.07] rounded-lg px-3 py-2.5 text-white placeholder-slate-700 focus:outline-none focus:border-emerald-500/40 text-sm transition"
-            />
-            {setup.enableHandicaps && (
+      <div className="space-y-2.5">
+        {setup.players.map((player, i) => {
+          const isEmpty = !player.name.trim();
+          return (
+            <div key={i} className="bg-white/[0.04] border border-white/[0.07] rounded-2xl p-4 space-y-3">
+              <div className="text-emerald-500 text-[10px] uppercase tracking-widest font-bold">
+                Player {i + 1}
+              </div>
               <input
-                type="number"
-                value={player.handicapIndex || ""}
+                value={player.name}
                 onChange={(e) => {
                   const updated = [...setup.players];
-                  updated[i] = { ...updated[i], handicapIndex: parseFloat(e.target.value) || 0 };
+                  updated[i] = { ...updated[i], name: e.target.value };
                   updatePlayers(updated);
                 }}
-                placeholder="Handicap index (e.g. 14.2)"
-                className="w-full bg-white/[0.05] border border-white/[0.07] rounded-lg px-3 py-2.5 text-white placeholder-slate-700 focus:outline-none focus:border-emerald-500/40 text-sm transition"
-                min={0}
-                max={54}
-                step={0.1}
+                placeholder={`Player ${i + 1} name`}
+                className={`w-full bg-white/[0.05] border rounded-xl px-3.5 py-3 text-white placeholder-slate-700 focus:outline-none text-sm transition ${
+                  isEmpty
+                    ? "border-white/[0.07] focus:border-emerald-500/40"
+                    : "border-emerald-500/20"
+                }`}
               />
-            )}
-          </div>
-        ))}
+              {setup.enableHandicaps && (
+                <input
+                  type="number"
+                  value={player.handicapIndex || ""}
+                  onChange={(e) => {
+                    const updated = [...setup.players];
+                    updated[i] = { ...updated[i], handicapIndex: parseFloat(e.target.value) || 0 };
+                    updatePlayers(updated);
+                  }}
+                  placeholder="Handicap index (e.g. 14.2)"
+                  className="w-full bg-white/[0.05] border border-white/[0.07] rounded-xl px-3.5 py-3 text-white placeholder-slate-700 focus:outline-none focus:border-emerald-500/40 text-sm transition"
+                  min={0}
+                  max={54}
+                  step={0.1}
+                />
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -134,7 +182,7 @@ function StepPlayers() {
 // ─── Step 3: Course selection ─────────────────────────────────────────────────
 
 function StepCourse() {
-  const { setup, selectCourse, clearCourse } = useMatchStore();
+  const { setup, selectCourse, clearCourse, setSetupStep } = useMatchStore();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<APICourse[]>([]);
   const [loading, setLoading] = useState(false);
@@ -154,12 +202,11 @@ function StepCourse() {
       setLoading(true);
       try {
         const searchResults = await searchCourses(val);
-        // Fetch full detail for first 5 results so we have tee data
         const detailed = await Promise.all(
           searchResults.slice(0, 5).map((r) => getCourseById(r.id))
         );
         setResults(detailed);
-      } catch (e) {
+      } catch {
         setError("Search failed. Check your connection and try again.");
       } finally {
         setLoading(false);
@@ -172,6 +219,8 @@ function StepCourse() {
     setResults([]);
     setQuery("");
     setExpanded(null);
+    // Auto-advance to game selection
+    setTimeout(() => setSetupStep(4), 350);
   }
 
   const selected = setup.selectedCourse;
@@ -180,34 +229,32 @@ function StepCourse() {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="text-xl font-bold">Select a course</h2>
-        <p className="text-slate-500 text-sm mt-1">
+        <h2 className="text-2xl font-bold tracking-tight">Select a course</h2>
+        <p className="text-slate-500 text-sm mt-1.5">
           Optional — skip to use a generic course.
         </p>
       </div>
 
-      {/* Selected course display */}
       {selected && selectedTee && (
-        <div className="bg-emerald-500/[0.08] border border-emerald-500/30 rounded-xl p-4 flex items-start justify-between gap-3">
+        <div className="bg-emerald-500/[0.08] border border-emerald-500/25 rounded-2xl p-4 flex items-start justify-between gap-3">
           <div>
-            <div className="font-semibold text-sm text-white">{selected.name}</div>
-            <div className="text-emerald-400 text-xs mt-0.5">
-              {getTeeName(selectedTee)} tees · {selectedTee.parTotal} par · {selectedTee.totalYards.toLocaleString()} yds
+            <div className="font-bold text-sm text-white">{selected.name}</div>
+            <div className="text-emerald-400 text-xs mt-1">
+              {getTeeName(selectedTee)} · Par {selectedTee.parTotal} · {selectedTee.totalYards.toLocaleString()} yds
             </div>
             <div className="text-slate-500 text-xs mt-0.5">
-              CR {selectedTee.courseRating} / Slope {selectedTee.slopeRating}
+              CR {selectedTee.courseRating} · Slope {selectedTee.slopeRating}
             </div>
           </div>
           <button
             onClick={() => clearCourse()}
-            className="text-slate-500 hover:text-red-400 text-xs shrink-0 transition"
+            className="text-slate-500 hover:text-red-400 text-xs shrink-0 transition mt-0.5"
           >
             Change
           </button>
         </div>
       )}
 
-      {/* Search input */}
       {!selected && (
         <div className="space-y-3">
           <div className="relative">
@@ -215,35 +262,32 @@ function StepCourse() {
               value={query}
               onChange={(e) => handleQueryChange(e.target.value)}
               placeholder="Search by course name…"
-              className="w-full bg-white/[0.05] border border-white/[0.07] rounded-xl px-4 py-3 text-white placeholder-slate-700 focus:outline-none focus:border-emerald-500/40 text-sm transition pr-10"
+              className="w-full bg-white/[0.04] border border-white/[0.07] rounded-2xl px-4 py-3.5 text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500/40 text-sm transition pr-10"
             />
             {loading && (
-              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+              <div className="absolute right-4 top-1/2 -translate-y-1/2">
                 <div className="w-4 h-4 border-2 border-emerald-500/40 border-t-emerald-500 rounded-full animate-spin" />
               </div>
             )}
           </div>
 
-          {error && (
-            <p className="text-red-400 text-xs">{error}</p>
-          )}
+          {error && <p className="text-red-400 text-xs px-1">{error}</p>}
 
-          {/* Results */}
           {results.length > 0 && (
             <div className="space-y-2">
               {results.map((course) => (
                 <div
                   key={course.id}
-                  className="bg-[#111] border border-white/[0.07] rounded-xl overflow-hidden"
+                  className="bg-white/[0.04] border border-white/[0.07] rounded-2xl overflow-hidden"
                 >
                   <button
                     onClick={() => setExpanded(expanded === course.id ? null : course.id)}
-                    className="w-full px-4 py-3 text-left flex items-center justify-between gap-2"
+                    className="w-full px-4 py-3.5 text-left flex items-center justify-between gap-2"
                   >
                     <div>
-                      <div className="font-medium text-sm text-white">{course.name}</div>
+                      <div className="font-semibold text-sm text-white">{course.name}</div>
                       <div className="text-slate-500 text-xs mt-0.5">
-                        {course.location.city}, {course.location.state} · {course.tees.length} tee sets
+                        {course.location.city}, {course.location.state} · {course.tees.length} tee options
                       </div>
                     </div>
                     <svg
@@ -256,23 +300,23 @@ function StepCourse() {
                   </button>
 
                   {expanded === course.id && (
-                    <div className="border-t border-white/[0.05] px-4 py-2 space-y-1">
+                    <div className="border-t border-white/[0.05] px-4 py-2 space-y-0.5">
                       {course.tees.map((tee) => (
                         <button
                           key={getTeeName(tee)}
                           onClick={() => handleSelectTee(course, tee)}
-                          className="w-full flex items-center justify-between py-2.5 hover:text-emerald-400 transition text-left group"
+                          className="w-full flex items-center justify-between py-3 hover:text-emerald-400 transition text-left group"
                         >
                           <div>
-                            <span className="text-sm font-medium group-hover:text-emerald-400 transition">
+                            <span className="text-sm font-semibold group-hover:text-emerald-400 transition">
                               {getTeeName(tee)}
                             </span>
                             <span className="text-slate-600 text-xs ml-2">
                               {tee.totalYards.toLocaleString()} yds
                             </span>
                           </div>
-                          <div className="text-slate-600 text-xs text-right">
-                            CR {tee.courseRating} / {tee.slopeRating}
+                          <div className="text-slate-600 text-xs">
+                            CR {tee.courseRating} · {tee.slopeRating}
                           </div>
                         </button>
                       ))}
@@ -284,7 +328,7 @@ function StepCourse() {
           )}
 
           {query && !loading && results.length === 0 && !error && (
-            <p className="text-slate-600 text-xs text-center py-4">
+            <p className="text-slate-600 text-xs text-center py-6">
               No courses found for &ldquo;{query}&rdquo;
             </p>
           )}
@@ -299,7 +343,6 @@ function StepCourse() {
 function formatBadge(game: GolfGameDefinition): string {
   if (game.bettingMode === BettingMode.Nassau) return "Nassau";
   if (game.bettingMode === BettingMode.Skins)  return "Skins";
-  if (game.scoringFormat === ScoringFormat.PointsBased) return "Points";
   return "";
 }
 
@@ -317,22 +360,22 @@ function GameCard({
   return (
     <button
       onClick={onClick}
-      className={`p-4 rounded-xl text-left space-y-2 border transition ${
+      className={`p-4 rounded-2xl text-left space-y-2 border transition active:scale-[0.97] ${
         selected
-          ? "border-emerald-500 bg-emerald-500/[0.08]"
-          : "border-white/[0.07] bg-[#111] hover:border-white/20"
+          ? "border-emerald-500/60 bg-emerald-500/[0.08] shadow-[0_0_16px_rgba(16,185,129,0.12)]"
+          : "border-white/[0.07] bg-white/[0.03] hover:bg-white/[0.06] hover:border-white/[0.12]"
       }`}
     >
       <div className="flex items-start justify-between gap-1">
-        <div className="font-semibold text-sm leading-tight">{game.name}</div>
+        <div className="font-bold text-sm leading-snug">{game.name}</div>
         {badge && (
-          <span className="text-[9px] uppercase tracking-wide bg-emerald-500/10 text-emerald-400 px-1.5 py-0.5 rounded shrink-0">
+          <span className="text-[9px] uppercase tracking-wide bg-emerald-500/10 text-emerald-400 px-1.5 py-0.5 rounded-md shrink-0 mt-0.5">
             {badge}
           </span>
         )}
       </div>
       <div className="text-slate-500 text-xs leading-relaxed">{game.description}</div>
-      <div className="text-slate-700 text-[10px]">
+      <div className="text-slate-600 text-[10px]">
         {game.minPlayers === game.maxPlayers
           ? `${game.minPlayers} players`
           : `${game.minPlayers}–${game.maxPlayers} players`}
@@ -342,7 +385,7 @@ function GameCard({
 }
 
 function StepGame() {
-  const { setup, selectGame } = useMatchStore();
+  const { setup, selectGame, selectFormat } = useMatchStore();
   const { customGames } = useGameLibraryStore();
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
@@ -355,12 +398,24 @@ function StepGame() {
   ];
   const available = getGamesForPlayerCount(setup.playerCount, allGames);
 
+  const validFormats = setup.selectedGame
+    ? getFormatsForPlayerCount(setup.selectedGame, setup.playerCount)
+    : [];
+
+  // Auto-select when only 1 valid format
+  useEffect(() => {
+    if (setup.selectedGame && validFormats.length === 1 && !setup.selectedFormat) {
+      selectFormat(validFormats[0]);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setup.selectedGame?.id]);
+
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="text-xl font-bold">Choose your game</h2>
-        <p className="text-slate-500 text-sm mt-1">
-          {available.length} games for {setup.playerCount} players
+        <h2 className="text-2xl font-bold tracking-tight">Choose your game</h2>
+        <p className="text-slate-500 text-sm mt-1.5">
+          {available.length} game{available.length !== 1 ? "s" : ""} for {setup.playerCount} player{setup.playerCount !== 1 ? "s" : ""}
         </p>
       </div>
 
@@ -369,7 +424,7 @@ function StepGame() {
           No games for {setup.playerCount} players. Adjust your group size.
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-2.5">
           {available.map((game) => (
             <GameCard
               key={game.id}
@@ -381,8 +436,33 @@ function StepGame() {
         </div>
       )}
 
-      <div className="text-center pt-2">
-        <a href="/games" className="text-emerald-500 text-xs hover:text-emerald-400 transition">
+      {/* Format picker */}
+      {setup.selectedGame && validFormats.length > 1 && (
+        <div className="space-y-2 pt-1">
+          <SectionLabel>How are you playing?</SectionLabel>
+          <div className="space-y-2">
+            {validFormats.map((fmt) => (
+              <button
+                key={fmt.label}
+                onClick={() => selectFormat(fmt)}
+                className={`w-full flex items-center justify-between px-4 py-3.5 rounded-2xl border text-left transition ${
+                  setup.selectedFormat?.label === fmt.label
+                    ? "border-emerald-500/60 bg-emerald-500/[0.08]"
+                    : "border-white/[0.07] bg-white/[0.03] hover:bg-white/[0.06]"
+                }`}
+              >
+                <span className="text-sm font-semibold">{fmt.label}</span>
+                {setup.selectedFormat?.label === fmt.label && (
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="text-center pt-1">
+        <a href="/games" className="text-slate-600 text-xs hover:text-emerald-400 transition">
           Browse full game library →
         </a>
       </div>
@@ -390,92 +470,197 @@ function StepGame() {
   );
 }
 
-// ─── Step 4: Betting ──────────────────────────────────────────────────────────
+// ─── Step 5: Betting ──────────────────────────────────────────────────────────
+
+const BETTING_STRUCTURES: Array<{
+  id: BettingStructure;
+  label: string;
+  description: string;
+}> = [
+  {
+    id: "FullMatch",
+    label: "Full Match",
+    description: "One bet — winner at end collects from each opponent.",
+  },
+  {
+    id: "HoleByHole",
+    label: "Hole by Hole",
+    description: "Win each hole, collect from every opponent.",
+  },
+  {
+    id: "Nassau",
+    label: "Nassau",
+    description: "Three bets: front 9, back 9, and overall.",
+  },
+];
 
 function StepBetting() {
   const { setup, updateBetting } = useMatchStore();
   if (!setup) return null;
 
-  const { betting, selectedGame } = setup;
-  const isSkins  = selectedGame?.bettingMode === BettingMode.Skins;
-  const isNassau = selectedGame?.bettingMode === BettingMode.Nassau;
+  const { betting, selectedGame, playerCount } = setup;
+  const isSkins    = selectedGame?.bettingMode === BettingMode.Skins;
+  const isNassauGame = selectedGame?.bettingMode === BettingMode.Nassau;
+  const isSolo     = playerCount === 1;
+
+  useEffect(() => {
+    if (isNassauGame && betting.structure !== "Nassau") {
+      updateBetting({ structure: "Nassau" });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isNassauGame]);
+
+  const amountLabel =
+    betting.structure === "HoleByHole" ? "Per Hole" :
+    betting.structure === "Nassau"     ? "Per Segment" :
+    "Match Bet";
+
+  const amountDescription =
+    betting.structure === "HoleByHole"
+      ? "Winner of each hole collects from every opponent."
+      : betting.structure === "Nassau"
+      ? "Front 9, Back 9, and Overall are each worth this."
+      : "Winner at end of round collects from each opponent.";
+
+  if (isSolo) {
+    return (
+      <div className="space-y-5">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">Betting</h2>
+          <p className="text-slate-500 text-sm mt-1.5">Not available for solo rounds.</p>
+        </div>
+        <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl px-4 py-8 text-center text-slate-600 text-sm">
+          Solo rounds don&apos;t support betting.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="text-xl font-bold">Betting</h2>
-        <p className="text-slate-500 text-sm mt-1">Optional — set stakes for the round.</p>
+        <h2 className="text-2xl font-bold tracking-tight">Betting</h2>
+        <p className="text-slate-500 text-sm mt-1.5">Optional — set stakes for the round.</p>
       </div>
 
       {/* Enable toggle */}
-      <div className="flex items-center justify-between bg-[#111] border border-white/[0.07] rounded-xl px-4 py-3.5">
+      <div className="flex items-center justify-between bg-white/[0.04] border border-white/[0.07] rounded-2xl px-4 py-3.5">
         <div>
-          <div className="text-sm font-medium">Enable Betting</div>
-          <div className="text-slate-500 text-xs mt-0.5">Track winnings hole by hole</div>
+          <div className="text-sm font-semibold">Enable Betting</div>
+          <div className="text-slate-500 text-xs mt-0.5">Track winnings in real time</div>
         </div>
         <Toggle on={betting.enabled} onToggle={() => updateBetting({ enabled: !betting.enabled })} />
       </div>
 
       {betting.enabled && (
-        <div className="space-y-3">
-          {/* Skins value */}
-          {isSkins && (
-            <div className="bg-[#111] border border-white/[0.07] rounded-xl p-4 space-y-3">
-              <SectionLabel>Value Per Skin</SectionLabel>
-              <p className="text-slate-500 text-xs">
-                Each skin is worth this amount. Carries over on ties.
-              </p>
-              <div className="flex items-center gap-2">
-                <span className="text-slate-500 text-sm">$</span>
-                <input
-                  type="number"
-                  value={betting.skinValue}
-                  onChange={(e) => updateBetting({ skinValue: Math.max(0, Number(e.target.value)) })}
-                  className="flex-1 bg-white/[0.05] border border-white/[0.07] rounded-lg px-3 py-2.5 text-white font-semibold focus:outline-none focus:border-emerald-500/40 transition"
-                  min={0}
-                  step={1}
-                />
-              </div>
+        <div className="space-y-4">
+          {/* Structure picker */}
+          {!isSkins && !isNassauGame && (
+            <div className="space-y-2">
+              <SectionLabel>Betting Structure</SectionLabel>
+              {BETTING_STRUCTURES.map((opt) => (
+                <button
+                  key={opt.id}
+                  onClick={() => updateBetting({ structure: opt.id })}
+                  className={`w-full flex items-start gap-3 px-4 py-3.5 rounded-2xl border text-left transition ${
+                    betting.structure === opt.id
+                      ? "border-emerald-500/60 bg-emerald-500/[0.08]"
+                      : "border-white/[0.07] bg-white/[0.03] hover:bg-white/[0.06]"
+                  }`}
+                >
+                  <div
+                    className={`mt-0.5 w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition ${
+                      betting.structure === opt.id ? "border-emerald-500" : "border-slate-600"
+                    }`}
+                  >
+                    {betting.structure === opt.id && (
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    )}
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold">{opt.label}</div>
+                    <div className="text-slate-500 text-xs mt-0.5">{opt.description}</div>
+                  </div>
+                </button>
+              ))}
             </div>
           )}
 
-          {/* Base bet (match play / nassau / stroke play) */}
+          {/* Skin value */}
+          {isSkins && (
+            <div className="bg-white/[0.04] border border-white/[0.07] rounded-2xl p-4 space-y-3">
+              <SectionLabel>Value Per Skin</SectionLabel>
+              <p className="text-slate-500 text-xs">Each skin carries over on ties.</p>
+              <AmountInput value={betting.skinValue} onChange={(n) => updateBetting({ skinValue: n })} />
+            </div>
+          )}
+
+          {/* Amount input */}
           {!isSkins && (
-            <div className="bg-[#111] border border-white/[0.07] rounded-xl p-4 space-y-3">
-              <SectionLabel>{isNassau ? "Bet Per Segment" : "Match Bet"}</SectionLabel>
-              <p className="text-slate-500 text-xs">
-                {isNassau
-                  ? "Front 9, Back 9, and Overall are each worth this amount independently."
-                  : "Winner collects this amount from each opponent."}
-              </p>
-              <div className="flex items-center gap-2">
-                <span className="text-slate-500 text-sm">$</span>
-                <input
-                  type="number"
-                  value={betting.baseBetAmount}
-                  onChange={(e) => updateBetting({ baseBetAmount: Math.max(0, Number(e.target.value)) })}
-                  className="flex-1 bg-white/[0.05] border border-white/[0.07] rounded-lg px-3 py-2.5 text-white font-semibold focus:outline-none focus:border-emerald-500/40 transition"
-                  min={0}
-                  step={1}
-                />
-              </div>
-              {isNassau && (
-                <div className="text-slate-600 text-xs">
-                  Max exposure: ${betting.baseBetAmount * 3} per player (3 bets)
+            <div className="bg-white/[0.04] border border-white/[0.07] rounded-2xl p-4 space-y-3">
+              <SectionLabel>{amountLabel}</SectionLabel>
+              <p className="text-slate-500 text-xs">{amountDescription}</p>
+              <AmountInput value={betting.amount} onChange={(n) => updateBetting({ amount: n })} />
+              {betting.structure === "Nassau" && betting.amount > 0 && (
+                <div className="text-slate-600 text-xs pt-1">
+                  Max exposure: ${betting.amount * 3} per player
                 </div>
               )}
             </div>
           )}
 
-          {/* Game + bet summary */}
-          {selectedGame && (
-            <div className="border border-white/[0.05] rounded-xl p-4 space-y-1.5">
+          {/* Nassau options */}
+          {(betting.structure === "Nassau" || isNassauGame) && (
+            <div className="bg-white/[0.04] border border-white/[0.07] rounded-2xl p-4 space-y-4">
+              <SectionLabel>Nassau Options</SectionLabel>
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-semibold">Auto-Press</div>
+                  <div className="text-slate-500 text-xs mt-0.5">
+                    Auto press when {betting.nassauAutoPressAt || 2} down
+                  </div>
+                </div>
+                <Toggle
+                  on={betting.nassauAutoPressAt > 0}
+                  onToggle={() => updateBetting({ nassauAutoPressAt: betting.nassauAutoPressAt > 0 ? 0 : 2 })}
+                />
+              </div>
+              {betting.nassauAutoPressAt > 0 && (
+                <div className="space-y-2">
+                  <div className="text-slate-600 text-[10px] uppercase tracking-widest">Press when down by</div>
+                  <div className="flex gap-2">
+                    {[1, 2, 3].map((n) => (
+                      <button
+                        key={n}
+                        onClick={() => updateBetting({ nassauAutoPressAt: n })}
+                        className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition ${
+                          betting.nassauAutoPressAt === n
+                            ? "bg-emerald-500 text-black"
+                            : "bg-white/[0.05] text-slate-400 hover:bg-white/10"
+                        }`}
+                      >
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <p className="text-slate-600 text-xs border-t border-white/[0.07] pt-3">
+                Manual presses can be called anytime during the round.
+              </p>
+            </div>
+          )}
+
+          {/* Summary */}
+          {selectedGame && betting.amount > 0 && (
+            <div className="border border-white/[0.06] rounded-2xl p-4 space-y-1">
               <SectionLabel>Summary</SectionLabel>
-              <div className="text-sm font-medium">{selectedGame.name}</div>
-              <div className="text-emerald-400 text-sm">
+              <div className="text-sm font-semibold">{selectedGame.name}</div>
+              <div className="text-emerald-400 text-sm font-medium">
                 {isSkins && `$${betting.skinValue} per skin`}
-                {isNassau && `$${betting.baseBetAmount} × 3 segments`}
-                {!isSkins && !isNassau && `$${betting.baseBetAmount} match`}
+                {!isSkins && betting.structure === "Nassau" && `$${betting.amount} × 3 segments`}
+                {!isSkins && betting.structure === "HoleByHole" && `$${betting.amount} per hole`}
+                {!isSkins && betting.structure === "FullMatch" && `$${betting.amount} match`}
               </div>
             </div>
           )}
@@ -495,10 +680,45 @@ export default function SetupPage() {
     if (!setup) initSetup(2);
   }, [setup, initSetup]);
 
+  // Auto-advance from step 4 when game + format are both selected.
+  // Must be declared before any early returns to satisfy Rules of Hooks.
+  useEffect(() => {
+    if (!setup || setup.step !== 4) return;
+    const validFormats = setup.selectedGame
+      ? getFormatsForPlayerCount(setup.selectedGame, setup.playerCount)
+      : [];
+    const needsFormat = validFormats.length > 1;
+    const isReady = setup.selectedGame !== null && (!needsFormat || setup.selectedFormat !== null);
+    if (!isReady) return;
+    const timer = setTimeout(() => {
+      if (setup.playerCount === 1) {
+        startRound();
+        router.push("/round");
+      } else {
+        setSetupStep(5);
+      }
+    }, 350);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setup?.selectedGame?.id, setup?.selectedFormat?.label, setup?.step]);
+
   if (!setup) return null;
 
+  // Derived values (non-hook)
+  const validFormats = setup.selectedGame
+    ? getFormatsForPlayerCount(setup.selectedGame, setup.playerCount)
+    : [];
+  const needsFormat = validFormats.length > 1;
+
+  // Validation
+  const allNamed = setup.players
+    .slice(0, setup.playerCount)
+    .every((p) => p.name.trim().length > 0);
+
   const canAdvance =
-    setup.step === 4 ? setup.selectedGame !== null : true;
+    setup.step === 2 ? allNamed :
+    setup.step === 4 ? (setup.selectedGame !== null && (!needsFormat || setup.selectedFormat !== null)) :
+    true;
 
   function handleBack() {
     if (setup!.step === 1) router.push("/");
@@ -507,51 +727,49 @@ export default function SetupPage() {
 
   function handleNext() {
     if (!canAdvance) return;
-    if (setup!.step < 5) {
-      setSetupStep((setup!.step + 1) as SetupState["step"]);
-    } else {
+    if (setup!.step === 5) {
       startRound();
       router.push("/round");
+    } else {
+      setSetupStep((setup!.step + 1) as SetupState["step"]);
     }
   }
 
   const stepLabels = ["Group", "Players", "Course", "Game", "Betting"];
 
   return (
-    <div className="min-h-dvh text-slate-100 flex flex-col max-w-md mx-auto">
-      {/* Header */}
-      <div className="px-4 pt-5 pb-4 border-b border-white/[0.05]">
-        <div className="flex items-center justify-between mb-4">
+    <div className="text-slate-100 flex flex-col max-w-md mx-auto">
+      {/* Header — sticky below the NavShell top bar */}
+      <div className="sticky top-14 z-20 bg-[#060d1a] px-4 pt-4 pb-3 border-b border-white/[0.06]">
+        <div className="flex items-center justify-between mb-3">
           <button
             onClick={handleBack}
-            className="text-slate-600 hover:text-white transition text-sm"
+            className="text-slate-600 hover:text-white transition text-sm font-medium"
           >
-            ← {setup.step === 1 ? "Home" : "Back"}
+            {setup.step === 1 ? "← Home" : "← Back"}
           </button>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
             {stepLabels.map((label, i) => (
-              <div key={i} className="flex items-center gap-1">
+              <div key={i} className="flex items-center gap-1.5">
                 <div
-                  className={`text-[10px] font-medium transition ${
-                    i + 1 === setup.step
-                      ? "text-white"
-                      : i + 1 < setup.step
-                      ? "text-emerald-500"
-                      : "text-slate-700"
+                  className={`text-[10px] font-semibold transition ${
+                    i + 1 === setup.step ? "text-white" :
+                    i + 1 < setup.step  ? "text-emerald-500" :
+                    "text-slate-700"
                   }`}
                 >
                   {label}
                 </div>
                 {i < stepLabels.length - 1 && (
-                  <div className={`text-slate-800 text-[10px]`}>·</div>
+                  <div className="text-slate-800 text-[10px]">·</div>
                 )}
               </div>
             ))}
           </div>
-          <div className="w-12" />
+          <div className="w-14" />
         </div>
         {/* Progress bar */}
-        <div className="h-px bg-white/[0.06] rounded-full overflow-hidden">
+        <div className="h-0.5 bg-white/[0.06] rounded-full overflow-hidden">
           <div
             className="h-full bg-emerald-500 rounded-full transition-all duration-300"
             style={{ width: `${(setup.step / 5) * 100}%` }}
@@ -560,7 +778,7 @@ export default function SetupPage() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 px-4 py-6 overflow-y-auto">
+      <div className="px-4 py-6">
         {setup.step === 1 && <StepGroupSize />}
         {setup.step === 2 && <StepPlayers />}
         {setup.step === 3 && <StepCourse />}
@@ -568,25 +786,28 @@ export default function SetupPage() {
         {setup.step === 5 && <StepBetting />}
       </div>
 
-      {/* Footer */}
-      <div className="px-4 pt-3 pb-8 border-t border-white/[0.05]">
-        <button
-          onClick={handleNext}
-          disabled={!canAdvance}
-          className={`w-full py-3.5 rounded-xl font-bold text-sm transition ${
-            canAdvance
-              ? "bg-emerald-500 text-black hover:bg-emerald-400 active:scale-[0.98]"
-              : "bg-white/[0.04] text-slate-700 cursor-not-allowed"
-          }`}
-        >
-          {setup.step === 5 ? "Start Round →" : "Continue →"}
-        </button>
-        {setup.step === 4 && !setup.selectedGame && (
-          <p className="text-center text-slate-700 text-xs mt-2">
-            Select a game to continue
-          </p>
-        )}
-      </div>
+      {/* Footer — sticky above the bottom tab bar */}
+      {/* Only shown on steps that need a manual Continue (steps 2, 3, 5) */}
+      {(setup.step === 2 || setup.step === 3 || setup.step === 5) && (
+        <div className="sticky bottom-24 z-20 px-4 pt-3 pb-3 bg-gradient-to-t from-[#060d1a] via-[#060d1a] to-[#060d1a]/0">
+          <button
+            onClick={handleNext}
+            disabled={!canAdvance}
+            className={`w-full py-4 rounded-2xl font-bold text-sm transition active:scale-[0.98] ${
+              canAdvance
+                ? "bg-emerald-500 text-black hover:bg-emerald-400 shadow-[0_4px_24px_rgba(16,185,129,0.3)]"
+                : "bg-white/[0.04] text-slate-600 cursor-not-allowed border border-white/[0.07]"
+            }`}
+          >
+            {setup.step === 5 ? "Start Round →" : "Continue →"}
+          </button>
+          {setup.step === 2 && !allNamed && (
+            <p className="text-center text-slate-600 text-xs mt-2">
+              Enter all player names to continue
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }

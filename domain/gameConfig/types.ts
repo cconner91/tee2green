@@ -19,18 +19,54 @@ export enum MatchupFormat {
 }
 
 /**
- * Describes HOW the betting is structured — independent of the core scoring format.
- *
- * Nassau and Skins are bet overlays, not gameplay formats. A Nassau is simply
- * three simultaneous match-play bets (front 9 / back 9 / overall) settled
- * independently. Skins is a per-hole prize pool with carry-overs on ties.
- * Both can technically be layered on top of any scoring format, but in practice
- * they imply specific scoring rules (match play and stroke play respectively).
+ * A valid combination of gameplay + matchup format for a multi-format game.
+ * Medal Play supports Solo and H2H individual, for example.
+ */
+export interface GameFormat {
+  gameplayFormat: GameplayFormat;
+  matchupFormat: MatchupFormat;
+  minPlayers: number;
+  maxPlayers: number;
+  /** Shown in the format picker, e.g. "Solo Round", "Individual vs Individual" */
+  label: string;
+}
+
+/**
+ * How the monetary bet is structured for stroke play and match play games.
+ * Chosen by the user in the betting setup step.
+ * Skins is its own game format — not a BettingStructure.
+ */
+export type BettingStructure = "HoleByHole" | "FullMatch" | "Nassau";
+
+/**
+ * Full betting configuration for a round.
+ * Defined here (not in matchStore) so roundSummary.ts can import it cleanly.
+ */
+export interface BettingConfig {
+  enabled: boolean;
+  /** Betting structure. Defaults to FullMatch. */
+  structure: BettingStructure;
+  /**
+   * Dollar amount:
+   * - HoleByHole: per hole won
+   * - FullMatch: total match bet (winner collects from each opponent)
+   * - Nassau: per segment (front / back / overall each worth this)
+   */
+  amount: number;
+  /** Value per skin — only used by the Skins game. */
+  skinValue: number;
+  /** Nassau only: auto-press when a player is this many holes down. 0 = disabled. */
+  nassauAutoPressAt: number;
+}
+
+/**
+ * @deprecated kept for the Skins game definition and Nassau game backward-compat.
+ * New code should use BettingStructure + BettingConfig instead.
  */
 export enum BettingMode {
   Standard = "Standard", // single settlement at end
-  Nassau = "Nassau",     // front / back / overall as three separate bets
-  Skins = "Skins",       // per-hole skin with carry-overs on ties
+  Nassau   = "Nassau",   // kept for Nassau game definition
+  Skins    = "Skins",    // Skins game: per-hole pool with carryovers
 }
 
 export interface GameConfiguration {
@@ -59,12 +95,17 @@ export interface GolfGameDefinition {
   tags: string[];
 
   /**
-   * "ready"  — fully wired to the scoring engine, playable today.
-   * "stub"   — shown in the Game Library as "coming soon" but blocked in setup.
-   *            Games that need a custom per-hole engine (Wolf, Vegas, Bingo Bango
-   *            Bongo) or team-assignment UI (Team Match Play, Ryder Cup) live here
-   *            until their dedicated engines are built.
-   * Omitting this field is equivalent to "ready".
+   * Optional: all valid gameplay+matchup combinations for this game.
+   * If present, the setup wizard filters by player count and shows a
+   * format picker when multiple combinations are valid.
+   * If absent, the game is locked to its gameplayFormat + matchupFormat.
+   */
+  supportedFormats?: GameFormat[];
+
+  /**
+   * "ready"  — fully wired, playable today.
+   * "stub"   — shown in game library as coming soon, blocked in setup.
+   * Omitting is equivalent to "ready".
    */
   engineStatus?: "ready" | "stub";
 }

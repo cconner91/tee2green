@@ -10,18 +10,35 @@ export const gameDefinitions: GolfGameDefinition[] = [
   // ─── Ready games ──────────────────────────────────────────────────────────────
   {
     id: "stroke-play-game",
-    name: "Stroke Play",
-    description: "Lowest total strokes over 18 holes wins. The classic format.",
+    name: "Medal Play (Stroke Play)",
+    description:
+      "Lowest total strokes over 18 holes wins. Play solo to track your round, or compete head-to-head.",
     scoringFormat: ScoringFormat.StrokePlay,
     gameplayFormat: GameplayFormat.Individual,
     matchupFormat: MatchupFormat.H2H,
     bettingMode: BettingMode.Standard,
-    minPlayers: 2,
+    minPlayers: 1,
     maxPlayers: 8,
     bettingEnabled: true,
     handicapEnabled: true,
     tags: ["Classic", "Individual"],
     engineStatus: "ready",
+    supportedFormats: [
+      {
+        gameplayFormat: GameplayFormat.Individual,
+        matchupFormat: MatchupFormat.Solo,
+        minPlayers: 1,
+        maxPlayers: 1,
+        label: "Solo Round",
+      },
+      {
+        gameplayFormat: GameplayFormat.Individual,
+        matchupFormat: MatchupFormat.H2H,
+        minPlayers: 2,
+        maxPlayers: 8,
+        label: "Individual vs Individual",
+      },
+    ],
   },
   {
     id: "match-play-game",
@@ -79,12 +96,28 @@ export const gameDefinitions: GolfGameDefinition[] = [
     gameplayFormat: GameplayFormat.Individual,
     matchupFormat: MatchupFormat.H2H,
     bettingMode: BettingMode.Standard,
-    minPlayers: 2,
+    minPlayers: 1,
     maxPlayers: 8,
     bettingEnabled: true,
     handicapEnabled: true,
     tags: ["Points", "Individual", "Fun"],
     engineStatus: "ready",
+    supportedFormats: [
+      {
+        gameplayFormat: GameplayFormat.Individual,
+        matchupFormat: MatchupFormat.Solo,
+        minPlayers: 1,
+        maxPlayers: 1,
+        label: "Solo Round",
+      },
+      {
+        gameplayFormat: GameplayFormat.Individual,
+        matchupFormat: MatchupFormat.H2H,
+        minPlayers: 2,
+        maxPlayers: 8,
+        label: "Individual vs Individual",
+      },
+    ],
   },
   {
     id: "team-best-ball",

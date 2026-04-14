@@ -10,6 +10,7 @@ import {
   calculateRoundSummary,
   RoundSummary,
   PlayerSummary,
+  MatchPlaySummary,
 } from "@/domain/scoring/roundSummary";
 
 // ─── Score utilities ──────────────────────────────────────────────────────────
@@ -20,20 +21,28 @@ function formatToPar(n: number): string {
 }
 
 function toParColor(n: number): string {
-  if (n < 0)  return "text-sky-400";
+  if (n < 0)   return "text-sky-400";
   if (n === 0) return "text-white";
   if (n === 1) return "text-orange-400";
   return "text-red-500";
 }
 
-/** Tailwind classes for a score cell relative to par */
-function scoreStyle(score: number, par: number) {
+function scoreStyle(score: number, par: number): string {
   const d = score - par;
-  if (d <= -2) return "rounded-full ring-1 ring-amber-400 text-amber-400";
+  // Ace or Albatross (≥3 under) — filled green circle
+  if (score === 1 || d <= -3) return "rounded-full bg-emerald-500 text-black";
+  // Eagle (2 under) — green, double-weight ring circle
+  if (d === -2) return "rounded-full ring-2 ring-emerald-400 text-emerald-400";
+  // Birdie (1 under) — blue, single ring circle
   if (d === -1) return "rounded-full ring-1 ring-sky-400 text-sky-400";
-  if (d === 0)  return "text-slate-300";
-  if (d === 1)  return "ring-1 ring-orange-400 text-orange-400";
-  return "ring-2 ring-red-500 text-red-400";
+  // Par — no decoration
+  if (d === 0) return "text-slate-300";
+  // Bogey (1 over) — orange, single square ring
+  if (d === 1) return "rounded ring-1 ring-orange-400 text-orange-400";
+  // Double bogey (2 over) — red, double square ring
+  if (d === 2) return "rounded ring-2 ring-red-500 text-red-400";
+  // Triple bogey or worse — filled red square
+  return "rounded bg-red-700 text-white";
 }
 
 function scoreLabel(score: number, par: number): string {
@@ -47,6 +56,11 @@ function scoreLabel(score: number, par: number): string {
   if (d === 2)  return "DBL";
   if (d === 3)  return "TRPL";
   return `+${d}`;
+}
+
+function moneySign(n: number): string {
+  if (n === 0) return "—";
+  return n > 0 ? `+$${n}` : `-$${Math.abs(n)}`;
 }
 
 // ─── No round ─────────────────────────────────────────────────────────────────
@@ -75,6 +89,7 @@ function NoRoundView() {
 
 function RoundComplete({ round, summary }: { round: ActiveRound; summary: RoundSummary }) {
   const { abandonRound } = useMatchStore();
+  const isSolo = round.players.length === 1;
 
   const sorted = [...summary.playerSummaries].sort((a, b) =>
     round.game.scoringFormat === "PointsBased"
@@ -82,12 +97,27 @@ function RoundComplete({ round, summary }: { round: ActiveRound; summary: RoundS
       : a.netToPar - b.netToPar
   );
 
+  const winner = sorted[0];
+
   return (
-    <div className="min-h-dvh text-slate-100 max-w-md mx-auto px-4 py-10 space-y-6">
+    <div className="min-h-dvh text-slate-100 max-w-md mx-auto px-4 py-10 space-y-5">
+      {/* Header */}
       <div className="text-center space-y-1 pb-2">
-        <div className="text-3xl mb-3">🏆</div>
-        <h1 className="text-xl font-bold">Round Complete</h1>
-        <p className="text-emerald-400 font-semibold">{sorted[0]?.name} wins</p>
+        {isSolo ? (
+          <>
+            <div className="text-3xl mb-3">⛳</div>
+            <h1 className="text-xl font-bold">Round Complete</h1>
+            <p className={`font-bold text-xl ${toParColor(winner?.netToPar ?? 0)}`}>
+              {formatToPar(winner?.netToPar ?? 0)}
+            </p>
+          </>
+        ) : (
+          <>
+            <div className="text-3xl mb-3">🏆</div>
+            <h1 className="text-xl font-bold">Round Complete</h1>
+            <p className="text-emerald-400 font-semibold">{winner?.name} wins</p>
+          </>
+        )}
       </div>
 
       {/* Leaderboard */}
@@ -99,11 +129,11 @@ function RoundComplete({ round, summary }: { round: ActiveRound; summary: RoundS
           <div
             key={ps.id}
             className={`flex items-center justify-between px-4 py-3.5 border-b border-white/[0.04] last:border-0 ${
-              rank === 0 ? "bg-emerald-500/[0.08]" : ""
+              rank === 0 && !isSolo ? "bg-emerald-500/[0.06]" : ""
             }`}
           >
             <div className="flex items-center gap-3">
-              <span className="text-slate-600 text-sm w-4">{rank + 1}</span>
+              {!isSolo && <span className="text-slate-600 text-sm w-4">{rank + 1}</span>}
               <span className="font-medium text-sm">{ps.name}</span>
             </div>
             <div className="text-right space-y-0.5">
@@ -122,47 +152,154 @@ function RoundComplete({ round, summary }: { round: ActiveRound; summary: RoundS
         ))}
       </div>
 
+      {/* ── Betting Settlement ──────────────────────────────────────────────── */}
+
       {/* Skins */}
       {summary.skins && (
-        <div className="bg-[#111] border border-white/[0.07] rounded-xl p-4 space-y-3">
-          <div className="text-[10px] uppercase tracking-widest text-slate-500">Skins Settlement</div>
-          {round.players.map((p) => (
-            <div key={p.id} className="flex justify-between text-sm">
-              <span className="text-slate-300">{p.name}</span>
-              <span className="font-semibold text-emerald-400">
-                {summary.skins!.skinsWon[p.id] ?? 0} skins · ${summary.skins!.moneyWon[p.id] ?? 0}
-              </span>
-            </div>
-          ))}
+        <div className="bg-[#111] border border-white/[0.07] rounded-xl overflow-hidden">
+          <div className="px-4 py-2.5 border-b border-white/[0.07]">
+            <span className="text-[10px] uppercase tracking-widest text-slate-500">
+              Skins · ${round.betting.skinValue}/skin
+            </span>
+          </div>
+          <div className="divide-y divide-white/[0.04]">
+            {round.players.map((p) => {
+              const skins = summary.skins!.skinsWon[p.id] ?? 0;
+              const money = summary.skins!.moneyWon[p.id] ?? 0;
+              return (
+                <div key={p.id} className="flex justify-between px-4 py-3 text-sm">
+                  <span className="text-slate-300">{p.name}</span>
+                  <div className="text-right">
+                    <span className={`font-semibold ${money > 0 ? "text-emerald-400" : "text-slate-500"}`}>
+                      {money > 0 ? `+$${money}` : "—"}
+                    </span>
+                    <span className="text-slate-600 text-xs ml-2">{skins} skins</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
           {summary.skins.currentCarryValue > 0 && (
-            <p className="text-slate-500 text-xs border-t border-white/[0.07] pt-2 mt-1">
-              ${summary.skins.currentCarryValue} carried — no winner on last hole
-            </p>
+            <div className="px-4 py-2.5 border-t border-white/[0.07] text-slate-500 text-xs">
+              ${summary.skins.currentCarryValue} carried — no winner on final hole
+            </div>
           )}
         </div>
       )}
 
       {/* Nassau */}
       {summary.nassau && round.betting.enabled && (
-        <div className="bg-[#111] border border-white/[0.07] rounded-xl p-4 space-y-3">
-          <div className="text-[10px] uppercase tracking-widest text-slate-500">
-            Nassau · ${round.betting.baseBetAmount} per segment
+        <div className="bg-[#111] border border-white/[0.07] rounded-xl overflow-hidden">
+          <div className="px-4 py-2.5 border-b border-white/[0.07]">
+            <span className="text-[10px] uppercase tracking-widest text-slate-500">
+              Nassau Settlement · ${round.betting.amount}/segment
+            </span>
           </div>
-          {(["front", "back", "overall"] as const).map((seg) => {
-            const mp = summary.nassau![seg];
-            const label = seg === "front" ? "Front 9" : seg === "back" ? "Back 9" : "Overall";
-            const winner = round.players.find((p) => p.id === mp.leaderId);
-            return (
-              <div key={seg} className="flex justify-between text-sm">
-                <span className="text-slate-400">{label}</span>
-                <span className="font-medium">
-                  {winner
-                    ? <span className="text-emerald-400">{winner.name} +${round.betting.baseBetAmount}</span>
-                    : <span className="text-slate-500">All Square</span>}
-                </span>
-              </div>
-            );
-          })}
+          <div className="divide-y divide-white/[0.04]">
+            {(["front", "back", "overall"] as const).map((seg) => {
+              const mp = summary.nassau![seg];
+              const ldr = round.players.find((p) => p.id === mp.leaderId);
+              const label = seg === "front" ? "Front 9" : seg === "back" ? "Back 9" : "Overall";
+              return (
+                <div key={seg} className="flex justify-between px-4 py-3 text-sm">
+                  <span className="text-slate-500">{label}</span>
+                  <span className={`font-medium ${ldr ? "text-emerald-400" : "text-slate-600"}`}>
+                    {ldr ? `${ldr.name} wins · +$${round.betting.amount}` : "All Square"}
+                  </span>
+                </div>
+              );
+            })}
+            {summary.nassau.presses.map((press, i) => {
+              const ldr = round.players.find((p) => p.id === press.match.leaderId);
+              return (
+                <div key={press.id} className="flex justify-between px-4 py-3 text-sm">
+                  <span className="text-slate-600">Press {i + 1} (H{press.startHole}+)</span>
+                  <span className={`font-medium ${ldr ? "text-emerald-400" : "text-slate-600"}`}>
+                    {ldr ? `${ldr.name} wins · +$${press.amount}` : "All Square"}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          {/* Net balance */}
+          <div className="px-4 py-3 border-t border-white/[0.07] space-y-1.5">
+            <div className="text-[10px] uppercase tracking-widest text-slate-600 mb-2">Net Balance</div>
+            {round.players.map((p) => {
+              const bal = summary.nassau!.balance[p.id] ?? 0;
+              return (
+                <div key={p.id} className="flex justify-between text-sm">
+                  <span className="text-slate-400">{p.name}</span>
+                  <span className={`font-bold ${bal > 0 ? "text-emerald-400" : bal < 0 ? "text-red-400" : "text-slate-600"}`}>
+                    {moneySign(bal)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Hole-by-Hole */}
+      {summary.holeByHole && round.betting.enabled && (
+        <div className="bg-[#111] border border-white/[0.07] rounded-xl overflow-hidden">
+          <div className="px-4 py-2.5 border-b border-white/[0.07]">
+            <span className="text-[10px] uppercase tracking-widest text-slate-500">
+              Hole by Hole · ${round.betting.amount}/hole
+            </span>
+          </div>
+          {/* Hole-by-hole history */}
+          <div className="divide-y divide-white/[0.04] max-h-40 overflow-y-auto">
+            {summary.holeByHole.history.map((h) => {
+              const winnerPlayer = round.players.find((p) => p.id === h.winner);
+              return (
+                <div key={h.holeNumber} className="flex justify-between px-4 py-2 text-xs">
+                  <span className="text-slate-600">Hole {h.holeNumber}</span>
+                  <span className={`font-medium ${winnerPlayer ? "text-emerald-400" : "text-slate-600"}`}>
+                    {winnerPlayer ? `${winnerPlayer.name} wins` : "Halved"}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          {/* Balance */}
+          <div className="px-4 py-3 border-t border-white/[0.07] space-y-1.5">
+            <div className="text-[10px] uppercase tracking-widest text-slate-600 mb-2">Net Balance</div>
+            {round.players.map((p) => {
+              const bal = summary.holeByHole!.balance[p.id] ?? 0;
+              return (
+                <div key={p.id} className="flex justify-between text-sm">
+                  <span className="text-slate-400">{p.name}</span>
+                  <span className={`font-bold ${bal > 0 ? "text-emerald-400" : bal < 0 ? "text-red-400" : "text-slate-600"}`}>
+                    {moneySign(bal)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Full Match */}
+      {summary.fullMatch && round.betting.enabled && (
+        <div className="bg-[#111] border border-white/[0.07] rounded-xl overflow-hidden">
+          <div className="px-4 py-2.5 border-b border-white/[0.07]">
+            <span className="text-[10px] uppercase tracking-widest text-slate-500">
+              Full Match · ${round.betting.amount}
+            </span>
+          </div>
+          <div className="px-4 py-3 space-y-2">
+            {round.players.map((p) => {
+              const bal = summary.fullMatch!.balance[p.id] ?? 0;
+              return (
+                <div key={p.id} className="flex justify-between text-sm">
+                  <span className="text-slate-400">{p.name}</span>
+                  <span className={`font-bold ${bal > 0 ? "text-emerald-400" : bal < 0 ? "text-red-400" : "text-slate-600"}`}>
+                    {moneySign(bal)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -210,7 +347,7 @@ function ScoreButtons({
   onSelect: (n: number) => void;
 }) {
   return (
-    <div className="grid grid-cols-5 gap-1.5 mt-3">
+    <div className="grid grid-cols-5 gap-2 mt-3">
       {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => {
         const isSelected = selected === n;
         const shape = scoreStyle(n, hole.par);
@@ -219,14 +356,18 @@ function ScoreButtons({
           <button
             key={n}
             onClick={() => onSelect(n)}
-            className={`flex flex-col items-center justify-center h-[52px] rounded-lg text-sm font-bold transition-all active:scale-90 ${
+            className={`flex flex-col items-center justify-center h-14 rounded-xl font-bold transition-all active:scale-90 ${
               isSelected
-                ? "bg-emerald-500/20 ring-1 ring-emerald-500 text-emerald-400 scale-105"
-                : `bg-white/[0.05] ${shape}`
+                ? "bg-emerald-500/20 ring-1 ring-emerald-400 text-emerald-400 scale-[1.06]"
+                : "bg-white/[0.04] text-slate-400 hover:bg-white/[0.08]"
             }`}
           >
-            <span className="leading-none">{n}</span>
-            <span className="text-[8px] mt-0.5 opacity-50 font-normal tracking-wide leading-none">{label}</span>
+            <span className={`text-base leading-none ${!isSelected ? shape : ""}`}>{n}</span>
+            {isSelected && (
+              <span className="text-[8px] mt-1 font-semibold tracking-wide leading-none text-emerald-400/70 uppercase">
+                {label}
+              </span>
+            )}
           </button>
         );
       })}
@@ -246,8 +387,6 @@ function ScorecardStrip({ round }: { round: ActiveRound }) {
   return (
     <div className="overflow-x-auto -mx-4 px-4">
       <div className="bg-[#0d0d0d] border border-white/[0.05] rounded-xl overflow-hidden" style={{ minWidth: 340 }}>
-
-        {/* Hole numbers */}
         <div className="flex border-b border-white/[0.06]">
           <div className="w-12 shrink-0 px-2 py-2 text-[9px] uppercase tracking-widest text-slate-700 font-semibold">HOLE</div>
           {holes.map((h) => (
@@ -258,7 +397,6 @@ function ScorecardStrip({ round }: { round: ActiveRound }) {
           <div className="w-10 shrink-0 text-center py-2 text-[10px] font-semibold text-slate-600">{segLabel}</div>
         </div>
 
-        {/* HCP / stroke index */}
         <div className="flex border-b border-white/[0.04]">
           <div className="w-12 shrink-0 px-2 py-1 text-[9px] uppercase tracking-widest text-slate-800 font-semibold">HCP</div>
           {holes.map((h) => (
@@ -269,7 +407,6 @@ function ScorecardStrip({ round }: { round: ActiveRound }) {
           <div className="w-10 shrink-0" />
         </div>
 
-        {/* Par */}
         <div className="flex border-b border-white/[0.06]">
           <div className="w-12 shrink-0 px-2 py-1.5 text-[9px] uppercase tracking-widest text-slate-600 font-semibold">PAR</div>
           {holes.map((h) => (
@@ -280,7 +417,6 @@ function ScorecardStrip({ round }: { round: ActiveRound }) {
           <div className="w-10 shrink-0 text-center py-1.5 text-[10px] font-bold text-slate-500">{segPar}</div>
         </div>
 
-        {/* Player rows */}
         {round.players.map((player, pi) => {
           const segTotal = holes.reduce((s, h) => {
             const r = round.holeResults.find((r) => r.holeNumber === h.number);
@@ -329,7 +465,6 @@ function ScorecardView({ round }: { round: ActiveRound }) {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      {/* Front / Back toggle */}
       <div className="flex bg-white/[0.05] rounded-xl p-1 mx-4 mt-4 mb-3 shrink-0">
         {(["front", "back"] as const).map((s) => (
           <button
@@ -344,11 +479,8 @@ function ScorecardView({ round }: { round: ActiveRound }) {
         ))}
       </div>
 
-      {/* Scrollable card */}
       <div className="flex-1 overflow-x-auto overflow-y-auto px-4 pb-[env(safe-area-inset-bottom,16px)]">
         <div className="bg-[#0d0d0d] border border-white/[0.06] rounded-xl overflow-hidden" style={{ minWidth: 360 }}>
-
-          {/* Hole numbers header */}
           <div className="flex border-b border-white/[0.07]">
             <div className="w-16 shrink-0 px-3 py-2.5 text-[9px] uppercase tracking-widest text-slate-700 font-semibold">HOLE</div>
             {holes.map((h) => (
@@ -359,7 +491,6 @@ function ScorecardView({ round }: { round: ActiveRound }) {
             <div className="w-14 shrink-0 text-center py-2.5 text-xs font-bold text-slate-500">{segLabel}</div>
           </div>
 
-          {/* Yardage — placeholder until course DB */}
           <div className="flex border-b border-white/[0.04]">
             <div className="w-16 shrink-0 px-3 py-1.5 text-[9px] uppercase tracking-widest text-slate-800 font-semibold">YDS</div>
             {holes.map((h) => (
@@ -368,7 +499,6 @@ function ScorecardView({ round }: { round: ActiveRound }) {
             <div className="w-14 shrink-0 text-center py-1.5 text-[9px] text-slate-800">—</div>
           </div>
 
-          {/* HCP / stroke index */}
           <div className="flex border-b border-white/[0.04]">
             <div className="w-16 shrink-0 px-3 py-1.5 text-[9px] uppercase tracking-widest text-slate-700 font-semibold">HCP</div>
             {holes.map((h) => (
@@ -377,7 +507,6 @@ function ScorecardView({ round }: { round: ActiveRound }) {
             <div className="w-14 shrink-0" />
           </div>
 
-          {/* Par */}
           <div className="flex border-b border-white/[0.08]">
             <div className="w-16 shrink-0 px-3 py-2 text-[9px] uppercase tracking-widest text-slate-500 font-semibold">PAR</div>
             {holes.map((h) => (
@@ -388,13 +517,14 @@ function ScorecardView({ round }: { round: ActiveRound }) {
             <div className="w-14 shrink-0 text-center py-2 text-xs font-bold text-slate-300">{segPar}</div>
           </div>
 
-          {/* Player rows */}
           {round.players.map((player, pi) => {
             const segResults = round.holeResults.filter((r) =>
               holes.some((h) => h.number === r.holeNumber)
             );
             const total = segResults.reduce((s, r) => s + (r.grossScores[player.id] ?? 0), 0);
-            const toPar = total > 0 ? total - segPar : null;
+            // Only count par for holes that have actually been played — not all 9
+            const parPlayed = segResults.reduce((s, r) => s + r.par, 0);
+            const toPar = total > 0 ? total - parPlayed : null;
             return (
               <div key={player.id} className={`flex ${pi < round.players.length - 1 ? "border-b border-white/[0.05]" : ""}`}>
                 <div className="w-16 shrink-0 px-3 py-3 text-xs font-semibold text-slate-200 truncate">
@@ -438,78 +568,222 @@ function ScorecardView({ round }: { round: ActiveRound }) {
   );
 }
 
-// ─── Betting strip ────────────────────────────────────────────────────────────
+// ─── Live Betting Panel ───────────────────────────────────────────────────────
 
-function BettingStrip({ round, summary }: { round: ActiveRound; summary: RoundSummary }) {
-  if (!round.betting.enabled) return null;
-  const { game, players, betting } = round;
-
+function MatchStatusBadge({ mp, players }: { mp: MatchPlaySummary; players: ActiveRound["players"] }) {
+  const leader = players.find((p) => p.id === mp.leaderId);
+  if (!leader) {
+    return <span className="text-slate-400 font-semibold">All Square</span>;
+  }
   return (
-    <div className="mx-4 mb-[max(12px,env(safe-area-inset-bottom))] bg-[#0d0d0d] border border-white/[0.06] rounded-xl px-4 py-3 space-y-2">
-      <div className="text-[10px] uppercase tracking-widest text-slate-600 mb-1">Betting</div>
+    <span>
+      <span className="text-emerald-400 font-bold">{leader.name}</span>
+      <span className="text-slate-400 font-medium"> {mp.status}</span>
+    </span>
+  );
+}
 
-      {game.bettingMode === BettingMode.Standard && summary.matchPlay && (
-        <div className="flex justify-between text-sm">
-          <span className="text-slate-500">Match</span>
-          <span className="font-medium text-white">
-            {summary.matchPlay.leaderId
-              ? `${players.find((p) => p.id === summary.matchPlay!.leaderId)?.name} — ${summary.matchPlay.status}`
-              : summary.matchPlay.status}
-          </span>
+function LiveBettingPanel({
+  round,
+  summary,
+}: {
+  round: ActiveRound;
+  summary: RoundSummary;
+}) {
+  const { addNassauPress } = useMatchStore();
+  if (!round.betting.enabled) return null;
+
+  const { betting, players, game } = round;
+  const isSkins = game.bettingMode === BettingMode.Skins;
+
+  // ── Skins ──────────────────────────────────────────────────────────────────
+  if (isSkins && summary.skins) {
+    const { skins } = summary;
+    const pot = skins.currentCarryValue;
+    return (
+      <div className="mx-4 bg-[#0a0f1a] border border-white/[0.07] rounded-xl overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/[0.06]">
+          <span className="text-[10px] uppercase tracking-widest text-slate-500">Skins · ${betting.skinValue}/skin</span>
+          {pot > 0 && (
+            <span className="text-xs font-semibold text-amber-400">Pot ${pot}</span>
+          )}
         </div>
-      )}
-
-      {game.bettingMode === BettingMode.Standard && !summary.matchPlay && (
-        <div className="flex justify-between text-sm">
-          <span className="text-slate-500">Leader</span>
-          <span className="font-medium text-white">
-            {[...summary.playerSummaries].sort((a, b) => a.netToPar - b.netToPar)[0]?.name ?? "—"}
-          </span>
+        <div className="grid grid-cols-2 divide-x divide-white/[0.06]">
+          {players.map((p) => (
+            <div key={p.id} className="px-4 py-3 text-center">
+              <div className="text-[10px] text-slate-600 truncate">{p.name}</div>
+              <div className="text-lg font-black text-emerald-400 mt-0.5">
+                {skins.skinsWon[p.id] ?? 0}
+              </div>
+              <div className="text-[10px] text-slate-600">${skins.moneyWon[p.id] ?? 0}</div>
+            </div>
+          ))}
         </div>
-      )}
+      </div>
+    );
+  }
 
-      {game.bettingMode === BettingMode.Nassau && summary.nassau && (
-        <>
+  // ── Nassau ─────────────────────────────────────────────────────────────────
+  if (summary.nassau) {
+    const { nassau } = summary;
+    const canPress =
+      !round.isComplete &&
+      players.length === 2 &&
+      !round.nassauPresses.some((p) => p.startHole === round.currentHole);
+
+    return (
+      <div className="mx-4 bg-[#0a0f1a] border border-white/[0.07] rounded-xl overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/[0.06]">
+          <span className="text-[10px] uppercase tracking-widest text-slate-500">
+            Nassau · ${betting.amount}/seg
+          </span>
+          {canPress && (
+            <button
+              onClick={addNassauPress}
+              className="text-xs font-semibold text-amber-400 hover:text-amber-300 bg-amber-400/10 px-2 py-0.5 rounded transition"
+            >
+              Press +
+            </button>
+          )}
+        </div>
+
+        {/* Segment rows */}
+        <div className="divide-y divide-white/[0.05]">
           {(["front", "back", "overall"] as const).map((seg) => {
-            const mp = summary.nassau![seg];
-            const ldr = players.find((p) => p.id === mp.leaderId);
+            const mp = nassau[seg];
+            const label = seg === "front" ? "Front" : seg === "back" ? "Back" : "Overall";
+            const holesLabel =
+              seg === "front"
+                ? `${Math.min(round.holeResults.length, 9)}/9`
+                : seg === "back"
+                ? `${Math.max(0, round.holeResults.length - 9)}/9`
+                : `${round.holeResults.length}/18`;
             return (
-              <div key={seg} className="flex justify-between text-sm">
-                <span className="text-slate-500 capitalize">
-                  {seg === "front" ? "Front" : seg === "back" ? "Back" : "Overall"}
-                </span>
-                <span className="font-medium text-emerald-400">
-                  {ldr ? `${ldr.name} ${mp.status}` : "All Square"}
-                </span>
+              <div key={seg} className="flex items-center justify-between px-4 py-2.5">
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-500 text-xs w-12">{label}</span>
+                  <span className="text-slate-700 text-[10px]">{holesLabel}</span>
+                </div>
+                <MatchStatusBadge mp={mp} players={players} />
               </div>
             );
           })}
-          <div className="text-slate-700 text-[10px] pt-0.5">
-            ${betting.baseBetAmount} per segment · max ${betting.baseBetAmount * 3}
-          </div>
-        </>
-      )}
 
-      {game.bettingMode === BettingMode.Skins && summary.skins && (
-        <>
-          {players.map((p) => (
-            <div key={p.id} className="flex justify-between text-sm">
-              <span className="text-slate-500">{p.name}</span>
-              <span className="font-medium text-emerald-400">
-                {summary.skins!.skinsWon[p.id] ?? 0} skins · ${summary.skins!.moneyWon[p.id] ?? 0}
-              </span>
+          {/* Active presses */}
+          {nassau.presses.map((press, i) => (
+            <div key={press.id} className="flex items-center justify-between px-4 py-2 bg-amber-400/[0.03]">
+              <div className="flex items-center gap-2">
+                <span className="text-amber-400/70 text-xs w-12">Press {i + 1}</span>
+                <span className="text-slate-700 text-[10px]">H{press.startHole}+</span>
+              </div>
+              <MatchStatusBadge mp={press.match} players={players} />
             </div>
           ))}
-          {summary.skins.currentCarryValue > 0 && (
-            <div className="text-amber-400 text-xs font-medium">
-              Pot: ${summary.skins.currentCarryValue} carrying
+        </div>
+
+        {/* Running balance */}
+        {round.holeResults.length > 0 && (
+          <div className="flex px-4 py-2.5 border-t border-white/[0.06] gap-3">
+            {players.map((p) => {
+              const bal = nassau.balance[p.id] ?? 0;
+              return (
+                <div key={p.id} className="flex items-center gap-1.5 text-xs">
+                  <span className="text-slate-600 truncate max-w-[60px]">{p.name}</span>
+                  <span className={`font-bold ${bal > 0 ? "text-emerald-400" : bal < 0 ? "text-red-400" : "text-slate-600"}`}>
+                    {moneySign(bal)}
+                  </span>
+                </div>
+              );
+            })}
+            <span className="text-slate-700 text-[10px] ml-auto self-center">est.</span>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── Hole-by-Hole ───────────────────────────────────────────────────────────
+  if (summary.holeByHole) {
+    const { holeByHole } = summary;
+    return (
+      <div className="mx-4 bg-[#0a0f1a] border border-white/[0.07] rounded-xl overflow-hidden">
+        <div className="px-4 py-2.5 border-b border-white/[0.06]">
+          <span className="text-[10px] uppercase tracking-widest text-slate-500">
+            Hole by Hole · ${betting.amount}/hole · thru {round.holeResults.length}
+          </span>
+        </div>
+        <div className="grid divide-x divide-white/[0.06]" style={{ gridTemplateColumns: `repeat(${players.length}, 1fr)` }}>
+          {players.map((p) => {
+            const bal = holeByHole.balance[p.id] ?? 0;
+            return (
+              <div key={p.id} className="px-3 py-3 text-center">
+                <div className="text-[10px] text-slate-600 truncate">{p.name}</div>
+                <div className={`text-lg font-black mt-0.5 ${bal > 0 ? "text-emerald-400" : bal < 0 ? "text-red-400" : "text-slate-600"}`}>
+                  {moneySign(bal)}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        {/* Last hole result */}
+        {holeByHole.history.length > 0 && (() => {
+          const last = holeByHole.history[holeByHole.history.length - 1];
+          const w = players.find((p) => p.id === last.winner);
+          return (
+            <div className="px-4 py-2 border-t border-white/[0.05] text-xs text-slate-600">
+              H{last.holeNumber}:{" "}
+              <span className={w ? "text-emerald-400" : "text-slate-500"}>
+                {w ? `${w.name} wins $${betting.amount}` : "Halved"}
+              </span>
+            </div>
+          );
+        })()}
+      </div>
+    );
+  }
+
+  // ── Full Match ─────────────────────────────────────────────────────────────
+  if (summary.fullMatch) {
+    const { fullMatch } = summary;
+    const leader = players.find((p) => p.id === fullMatch.leaderId);
+
+    // Show match play status for match play games, stroke lead for stroke play
+    let statusLine: string;
+    if (summary.matchPlay) {
+      statusLine = summary.matchPlay.leaderId
+        ? `${players.find((p) => p.id === summary.matchPlay!.leaderId)?.name} — ${summary.matchPlay.status}`
+        : "All Square";
+    } else {
+      const sorted = [...summary.playerSummaries].sort((a, b) => a.netToPar - b.netToPar);
+      if (sorted.length >= 2 && sorted[0].netToPar < sorted[1].netToPar) {
+        const lead = sorted[0].netToPar - sorted[1].netToPar; // negative = ahead
+        statusLine = `${sorted[0].name} leads by ${Math.abs(lead)}`;
+      } else {
+        statusLine = "All Square";
+      }
+    }
+
+    return (
+      <div className="mx-4 bg-[#0a0f1a] border border-white/[0.07] rounded-xl overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/[0.06]">
+          <span className="text-[10px] uppercase tracking-widest text-slate-500">
+            Full Match · ${betting.amount}
+          </span>
+          <span className="text-xs text-slate-500">thru {round.holeResults.length}</span>
+        </div>
+        <div className="px-4 py-3 space-y-1">
+          <div className="text-sm font-semibold text-slate-200">{statusLine}</div>
+          {leader && (
+            <div className="text-xs text-emerald-400">
+              {leader.name} leads · ${betting.amount} match
             </div>
           )}
-          <div className="text-slate-700 text-[10px]">${betting.skinValue} per skin</div>
-        </>
-      )}
-    </div>
-  );
+        </div>
+      </div>
+    );
+  }
+
+  return null;
 }
 
 // ─── Hole view ────────────────────────────────────────────────────────────────
@@ -532,12 +806,12 @@ function HoleView({
   const allEntered = round.players.every((p) => grossScores[p.id] != null);
 
   const psMap = Object.fromEntries(summary.playerSummaries.map((ps) => [ps.id, ps]));
+  const isSolo = round.players.length === 1;
 
-  // Leader detection
   const leaderIds = new Set<PlayerId>();
   if (summary.matchPlay?.leaderId) {
     leaderIds.add(summary.matchPlay.leaderId);
-  } else if (!summary.nassau) {
+  } else if (!summary.nassau && !isSolo) {
     const sorted = [...summary.playerSummaries].sort((a, b) => a.netToPar - b.netToPar);
     if (sorted.length && sorted[0].holesPlayed > 0) leaderIds.add(sorted[0].id);
   }
@@ -547,9 +821,18 @@ function HoleView({
       {/* Hole header */}
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-3xl font-black tracking-tight">Hole {round.currentHole}</div>
-          <div className="text-slate-500 text-xs mt-0.5">
-            Stroke Index {hole.strokeIndex}
+          <div className="text-4xl font-black tracking-tight leading-none">
+            {round.currentHole}
+            <span className="text-slate-600 text-xl font-semibold ml-1.5">/ {round.courseHoles.length}</span>
+          </div>
+          <div className="text-slate-500 text-xs mt-1.5 flex items-center gap-1.5">
+            <span>SI {hole.strokeIndex}</span>
+            {round.course.name && (
+              <>
+                <span className="text-slate-700">·</span>
+                <span className="truncate max-w-[140px]">{round.course.name}</span>
+              </>
+            )}
           </div>
         </div>
         <div className="text-right">
@@ -557,25 +840,6 @@ function HoleView({
           <ParSelector hole={hole} onChange={(p) => setHolePar(hole.number, p)} />
         </div>
       </div>
-
-      {/* Match status */}
-      {summary.matchPlay && (
-        <div className="flex items-center gap-2">
-          <div
-            className={`text-sm font-semibold ${
-              summary.matchPlay.leaderId ? "text-emerald-400" : "text-slate-400"
-            }`}
-          >
-            {summary.matchPlay.leaderId
-              ? `${round.players.find((p) => p.id === summary.matchPlay!.leaderId)?.name} — ${summary.matchPlay.status}`
-              : summary.matchPlay.status}
-          </div>
-          <div className="h-px flex-1 bg-white/[0.05]" />
-          <div className="text-slate-600 text-xs">
-            Thru {summary.holesPlayed}
-          </div>
-        </div>
-      )}
 
       {/* Mini scorecard */}
       <ScorecardStrip round={round} />
@@ -585,7 +849,6 @@ function HoleView({
         const ps: PlayerSummary | undefined = psMap[player.id];
         const isLeader = leaderIds.has(player.id) && summary.holesPlayed > 0;
 
-        // Strokes received this hole
         const ph = round.playingHandicaps[player.id] ?? 0;
         const strokesThisHole =
           round.enableHandicaps && ph > 0
@@ -595,22 +858,24 @@ function HoleView({
         return (
           <div
             key={player.id}
-            className={`bg-[#111] rounded-xl p-4 border transition ${
-              isLeader ? "border-emerald-500/40" : "border-white/[0.06]"
+            className={`rounded-2xl p-4 border transition ${
+              isLeader
+                ? "bg-emerald-500/[0.06] border-emerald-500/30 shadow-[0_0_20px_rgba(16,185,129,0.08)]"
+                : "bg-slate-900/60 border-slate-700/40"
             }`}
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="font-semibold text-sm">{player.name}</span>
+                <span className="font-bold text-sm">{player.name}</span>
                 {strokesThisHole > 0 && (
-                  <span className="text-sky-400 text-[10px] font-medium bg-sky-400/10 px-1.5 py-0.5 rounded">
-                    +{strokesThisHole} HCP
+                  <span className="text-sky-400 text-[10px] font-semibold bg-sky-400/10 px-1.5 py-0.5 rounded-md">
+                    +{strokesThisHole}
                   </span>
                 )}
               </div>
               <div className="text-right">
                 {ps && ps.holesPlayed > 0 ? (
-                  <span className={`text-2xl font-black ${toParColor(ps.netToPar)}`}>
+                  <span className={`text-2xl font-black tabular-nums ${toParColor(ps.netToPar)}`}>
                     {ps.stablefordPoints !== undefined
                       ? `${ps.stablefordPoints}pts`
                       : formatToPar(ps.netToPar)}
@@ -629,7 +894,7 @@ function HoleView({
         );
       })}
 
-      {/* Submit + undo — padded for iOS home indicator */}
+      {/* Submit + undo */}
       <div className="pb-[env(safe-area-inset-bottom,8px)] space-y-1">
         <button
           onClick={onSubmit}
@@ -642,7 +907,6 @@ function HoleView({
         >
           {allEntered ? `Submit Hole ${round.currentHole}` : "Enter all scores to continue"}
         </button>
-
         {round.holeResults.length > 0 && <UndoButton />}
       </div>
     </div>
@@ -682,7 +946,8 @@ export default function RoundView() {
     round.players,
     round.game,
     round.course,
-    round.betting.skinValue
+    round.betting,
+    round.nassauPresses ?? []
   );
 
   if (round.isComplete) return <RoundComplete round={round} summary={summary} />;
@@ -707,7 +972,7 @@ export default function RoundView() {
 
   return (
     <div className="min-h-dvh text-slate-100 flex flex-col max-w-md mx-auto">
-      {/* Tab bar — sits below the 56px (h-14) NavShell header */}
+      {/* Tab bar */}
       <div className="flex border-b border-white/[0.06] bg-[#060d1a]/95 backdrop-blur-xl sticky top-14 z-10">
         <button
           onClick={() => setTab("hole")}
@@ -740,7 +1005,10 @@ export default function RoundView() {
             setScore={setScore}
             onSubmit={handleSubmit}
           />
-          <BettingStrip round={round} summary={summary} />
+          {/* Live betting panel — sits between hole content and safe area */}
+          <div className="pb-[env(safe-area-inset-bottom,12px)] pt-2 space-y-0">
+            <LiveBettingPanel round={round} summary={summary} />
+          </div>
         </>
       ) : (
         <ScorecardView round={round} />
