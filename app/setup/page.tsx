@@ -828,18 +828,19 @@ function MatchSummaryModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-sm"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/75 backdrop-blur-sm px-4"
       onClick={onEdit}
     >
       <div
-        className="w-full max-w-md bg-[#0c1628] border-t border-white/[0.08] rounded-t-3xl px-5 pt-5 pb-[env(safe-area-inset-bottom,20px)] overflow-y-auto max-h-[92vh]"
+        className="w-full max-w-sm bg-[#0e1a2e] border border-white/[0.1] rounded-3xl overflow-hidden shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Handle */}
-        <div className="w-10 h-1 bg-white/10 rounded-full mx-auto mb-5" />
-
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-lg font-bold">Match Summary</h2>
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 pt-5 pb-3">
+          <div>
+            <h2 className="text-base font-bold tracking-tight">Ready to tee off?</h2>
+            <p className="text-slate-500 text-xs mt-0.5">Review your match details</p>
+          </div>
           <button
             onClick={onEdit}
             className="w-8 h-8 flex items-center justify-center rounded-full bg-white/[0.06] text-slate-400 hover:text-white hover:bg-white/[0.1] transition"
@@ -851,9 +852,12 @@ function MatchSummaryModal({
             </svg>
           </button>
         </div>
-        <p className="text-slate-600 text-xs mb-1">Review your setup before starting.</p>
 
-        <div className="space-y-0 pb-5">
+        {/* Divider */}
+        <div className="h-px bg-white/[0.06] mx-5" />
+
+        {/* Summary rows */}
+        <div className="px-5 py-2">
           <SummaryRow label="Players">
             {players.map((p, i) => (
               <div key={i} className="flex items-center justify-end gap-2">
@@ -892,12 +896,21 @@ function MatchSummaryModal({
           </SummaryRow>
         </div>
 
-        <button
-          onClick={onConfirm}
-          className="w-full py-4 rounded-2xl font-black text-sm text-black bg-emerald-500 hover:bg-emerald-400 active:scale-[0.98] transition shadow-[0_4px_24px_rgba(16,185,129,0.3)]"
-        >
-          ⛳ Confirm &amp; Start Match
-        </button>
+        {/* Actions */}
+        <div className="px-5 pb-5 pt-3 flex flex-col gap-2">
+          <button
+            onClick={onConfirm}
+            className="w-full py-4 rounded-2xl font-black text-sm text-black bg-emerald-500 hover:bg-emerald-400 active:scale-[0.98] transition shadow-[0_4px_24px_rgba(16,185,129,0.35)]"
+          >
+            ⛳ Start Match
+          </button>
+          <button
+            onClick={onEdit}
+            className="w-full py-3 rounded-2xl font-semibold text-sm text-slate-400 hover:text-white transition"
+          >
+            Go Back
+          </button>
+        </div>
       </div>
     </div>
   );
