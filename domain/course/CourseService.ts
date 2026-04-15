@@ -33,7 +33,7 @@ function normalizeRawTee(raw: RawAPITee): APITee {
   };
 }
 
-function normalizeRawCourse(raw: RawAPICourse): APICourse {
+export function normalizeRawCourse(raw: RawAPICourse): APICourse {
   const maleTees = (raw.tees.male ?? []).map(normalizeRawTee);
   const femaleTees = (raw.tees.female ?? []).map(normalizeRawTee);
 
@@ -94,7 +94,7 @@ async function dbSearch(query: string): Promise<APICourseSearchResult[]> {
  * Write a full APICourse object to Supabase.
  * Uses upsert so re-fetching a known course just refreshes it.
  */
-async function dbUpsert(course: APICourse): Promise<void> {
+export async function dbUpsert(course: APICourse): Promise<void> {
   await supabase.from("courses").upsert({
     id: course.id,
     name: course.name,
