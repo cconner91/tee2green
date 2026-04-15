@@ -195,7 +195,6 @@ function StepCourse() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<number | null>(null);
-  const [showManual, setShowManual] = useState(false);
   const [manualFields, setManualFields] = useState<ManualCourseDetails>(
     setup?.manualCourse ?? DEFAULT_MANUAL
   );
@@ -242,13 +241,6 @@ function StepCourse() {
     setManualCourse(hasData ? updated : null);
   }
 
-  function toggleManual(show: boolean) {
-    setShowManual(show);
-    if (!show) {
-      setManualFields(DEFAULT_MANUAL);
-      setManualCourse(null);
-    }
-  }
 
   const selected = setup.selectedCourse;
   const selectedTee = setup.selectedTee;
@@ -361,89 +353,56 @@ function StepCourse() {
             </p>
           )}
 
-          {/* Manual entry section */}
-          <div className="border border-white/[0.07] rounded-2xl overflow-hidden">
-            <button
-              onClick={() => toggleManual(!showManual)}
-              className="w-full flex items-center justify-between px-4 py-3.5 text-left"
-            >
+          {/* No Course — always-visible manual details */}
+          <div className="border border-white/[0.07] rounded-2xl px-4 py-4 space-y-3 bg-white/[0.02]">
+            <div>
+              <div className="text-sm font-semibold text-white">No course in our system?</div>
+              <div className="text-slate-600 text-xs mt-0.5">Enter Course Rating &amp; Slope for accurate handicap calculations</div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-widest text-slate-600 mb-1.5">Course Name (optional)</div>
+              <input
+                value={manualFields.name}
+                onChange={(e) => handleManualField("name", e.target.value)}
+                placeholder="e.g. Pebble Beach Golf Links"
+                className="w-full bg-white/[0.04] border border-white/[0.07] rounded-xl px-3.5 py-2.5 text-white placeholder-slate-700 focus:outline-none focus:border-emerald-500/40 text-sm transition"
+              />
+            </div>
+            <div className="grid grid-cols-3 gap-2.5">
               <div>
-                <div className="text-sm font-semibold text-white">
-                  {showManual ? "Manual Entry" : "Enter Course Details Manually"}
-                </div>
-                <div className="text-slate-600 text-xs mt-0.5">
-                  {showManual
-                    ? "CR & Slope used for handicap calculations"
-                    : "Useful for local or unlisted courses"}
-                </div>
+                <div className="text-[10px] uppercase tracking-widest text-slate-600 mb-1.5">Par</div>
+                <input
+                  type="number"
+                  value={manualFields.par}
+                  onChange={(e) => handleManualField("par", parseInt(e.target.value) || 72)}
+                  className="w-full bg-white/[0.04] border border-white/[0.07] rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-emerald-500/40 text-sm transition text-center"
+                  min={54} max={90}
+                />
               </div>
-              <svg
-                width="14" height="14" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" strokeWidth="2" strokeLinecap="round"
-                className={`text-slate-600 shrink-0 transition-transform ${showManual ? "rotate-180" : ""}`}
-              >
-                <polyline points="6 9 12 15 18 9" />
-              </svg>
-            </button>
-
-            {showManual && (
-              <div className="border-t border-white/[0.05] px-4 py-4 space-y-3 bg-white/[0.02]">
-                <div>
-                  <div className="text-[10px] uppercase tracking-widest text-slate-600 mb-1.5">Course Name (optional)</div>
-                  <input
-                    value={manualFields.name}
-                    onChange={(e) => handleManualField("name", e.target.value)}
-                    placeholder="e.g. Pebble Beach Golf Links"
-                    className="w-full bg-white/[0.04] border border-white/[0.07] rounded-xl px-3.5 py-2.5 text-white placeholder-slate-700 focus:outline-none focus:border-emerald-500/40 text-sm transition"
-                  />
-                </div>
-                <div className="grid grid-cols-3 gap-2.5">
-                  <div>
-                    <div className="text-[10px] uppercase tracking-widest text-slate-600 mb-1.5">Par</div>
-                    <input
-                      type="number"
-                      value={manualFields.par}
-                      onChange={(e) => handleManualField("par", parseInt(e.target.value) || 72)}
-                      className="w-full bg-white/[0.04] border border-white/[0.07] rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-emerald-500/40 text-sm transition text-center"
-                      min={54} max={90}
-                    />
-                  </div>
-                  <div>
-                    <div className="text-[10px] uppercase tracking-widest text-slate-600 mb-1.5">Course Rating</div>
-                    <input
-                      type="number"
-                      value={manualFields.courseRating}
-                      onChange={(e) => handleManualField("courseRating", parseFloat(e.target.value) || 72.0)}
-                      className="w-full bg-white/[0.04] border border-white/[0.07] rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-emerald-500/40 text-sm transition text-center"
-                      min={60} max={80} step={0.1}
-                    />
-                  </div>
-                  <div>
-                    <div className="text-[10px] uppercase tracking-widest text-slate-600 mb-1.5">Slope</div>
-                    <input
-                      type="number"
-                      value={manualFields.slopeRating}
-                      onChange={(e) => handleManualField("slopeRating", parseInt(e.target.value) || 113)}
-                      className="w-full bg-white/[0.04] border border-white/[0.07] rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-emerald-500/40 text-sm transition text-center"
-                      min={55} max={155}
-                    />
-                  </div>
-                </div>
-                <p className="text-slate-700 text-[10px]">
-                  CR &amp; Slope drive handicap stroke allocation. Hole-by-hole pars use a standard Par 72 layout.
-                </p>
+              <div>
+                <div className="text-[10px] uppercase tracking-widest text-slate-600 mb-1.5">Course Rating</div>
+                <input
+                  type="number"
+                  value={manualFields.courseRating}
+                  onChange={(e) => handleManualField("courseRating", parseFloat(e.target.value) || 72.0)}
+                  className="w-full bg-white/[0.04] border border-white/[0.07] rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-emerald-500/40 text-sm transition text-center"
+                  min={60} max={80} step={0.1}
+                />
               </div>
-            )}
-          </div>
-
-          {/* Skip */}
-          <div className="text-center">
-            <button
-              onClick={() => setSetupStep(4)}
-              className="text-slate-500 text-xs hover:text-slate-300 transition"
-            >
-              Continue without a course →
-            </button>
+              <div>
+                <div className="text-[10px] uppercase tracking-widest text-slate-600 mb-1.5">Slope</div>
+                <input
+                  type="number"
+                  value={manualFields.slopeRating}
+                  onChange={(e) => handleManualField("slopeRating", parseInt(e.target.value) || 113)}
+                  className="w-full bg-white/[0.04] border border-white/[0.07] rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-emerald-500/40 text-sm transition text-center"
+                  min={55} max={155}
+                />
+              </div>
+            </div>
+            <p className="text-slate-700 text-[10px]">
+              CR &amp; Slope drive handicap stroke allocation.
+            </p>
           </div>
         </div>
       )}
@@ -924,7 +883,7 @@ export default function SetupPage() {
   const [showSummary, setShowSummary] = useState(false);
 
   useEffect(() => {
-    if (!setup) initSetup(2);
+    if (!setup) initSetup(0);
   }, [setup, initSetup]);
 
   // Auto-advance from step 4 when game + format are both selected.
@@ -1036,16 +995,36 @@ export default function SetupPage() {
       </div>
 
       {/* Content — extra bottom padding on steps with fixed Continue button */}
-      <div className={`px-4 py-6 ${[2, 3, 5].includes(setup.step) ? "pb-36" : ""}`}>
+      <div className={`px-4 py-6 ${[3, 5].includes(setup.step) ? "pb-36" : ""}`}>
         {setup.step === 1 && <StepGroupSize />}
         {setup.step === 2 && <StepPlayers />}
+        {setup.step === 2 && (
+          <div className="mt-5 space-y-2">
+            <button
+              onClick={handleNext}
+              disabled={!canAdvance}
+              className={`w-full py-4 rounded-2xl font-bold text-sm transition active:scale-[0.98] ${
+                canAdvance
+                  ? "bg-emerald-500 text-black hover:bg-emerald-400 shadow-[0_4px_24px_rgba(16,185,129,0.3)]"
+                  : "bg-white/[0.04] text-slate-600 cursor-not-allowed border border-white/[0.07]"
+              }`}
+            >
+              Continue →
+            </button>
+            {!allNamed && (
+              <p className="text-center text-slate-600 text-xs">
+                Enter all player names to continue
+              </p>
+            )}
+          </div>
+        )}
         {setup.step === 3 && <StepCourse />}
         {setup.step === 4 && <StepGame />}
         {setup.step === 5 && <StepBetting />}
       </div>
 
-      {/* Fixed Continue button — floats above the tab bar, never overlaps content */}
-      {(setup.step === 2 || setup.step === 3 || setup.step === 5) && (
+      {/* Fixed Continue button — floats above the tab bar for steps 3 and 5 */}
+      {(setup.step === 3 || setup.step === 5) && (
         <div className="fixed bottom-24 inset-x-0 z-20 flex justify-center px-4 pointer-events-none">
           <div className="w-full max-w-md pointer-events-auto">
             <div className="bg-gradient-to-t from-[#060d1a] via-[#060d1a]/90 to-transparent pt-6 pb-3 px-0">
@@ -1060,11 +1039,6 @@ export default function SetupPage() {
               >
                 {setup.step === 5 ? "Review & Start →" : "Continue →"}
               </button>
-              {setup.step === 2 && !allNamed && (
-                <p className="text-center text-slate-600 text-xs mt-2">
-                  Enter all player names to continue
-                </p>
-              )}
             </div>
           </div>
         </div>

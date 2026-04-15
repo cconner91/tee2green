@@ -96,6 +96,8 @@ interface MatchStore {
   // Round actions
   startRound: () => void;
   setHolePar: (holeNumber: number, par: number) => void;
+  setHoleStrokeIndex: (holeNumber: number, strokeIndex: number) => void;
+  editHoleScore: (holeNumber: number, playerId: PlayerId, score: number) => void;
   submitHole: (grossScores: Record<PlayerId, number>) => void;
   undoLastHole: () => void;
   addNassauPress: () => void;
@@ -303,6 +305,28 @@ export const useMatchStore = create<MatchStore>()(
           h.number === holeNumber ? { ...h, par } : h
         );
         set({ round: { ...round, courseHoles: updated } });
+      },
+
+      setHoleStrokeIndex: (holeNumber, strokeIndex) => {
+        const { round } = get();
+        if (!round) return;
+        const updated = round.courseHoles.map((h) =>
+          h.number === holeNumber ? { ...h, strokeIndex } : h
+        );
+        set({ round: { ...round, courseHoles: updated } });
+      },
+
+      editHoleScore: (holeNumber, playerId, score) => {
+        const { round } = get();
+        if (!round) return;
+        const updatedResults = round.holeResults.map((r) => {
+          if (r.holeNumber !== holeNumber) return r;
+          const holeData = round.courseHoles.find((h) => h.number === holeNumber);
+          if (!holeData) return r;
+          const newGrossScores = { ...r.grossScores, [playerId]: score };
+          return evaluateHole(holeData, newGrossScores, round.playingHandicaps);
+        });
+        set({ round: { ...round, holeResults: updatedResults } });
       },
 
       submitHole: (grossScores) => {

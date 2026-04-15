@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useMatchStore, ActiveRound } from "@/store/matchStore";
 import { PlayerId } from "@/domain/models/Player";
@@ -470,16 +470,122 @@ function ScorecardStrip({ round }: { round: ActiveRound }) {
   );
 }
 
+// ─── Scorecard edit modal ─────────────────────────────────────────────────────
+
+function ScoreEditModal({
+  holeNumber,
+  par,
+  player,
+  currentScore,
+  onSave,
+  onClose,
+}: {
+  holeNumber: number;
+  par: number;
+  player: ActiveRound["players"][0];
+  currentScore: number | undefined;
+  onSave: (score: number) => void;
+  onClose: () => void;
+}) {
+  const [selected, setSelected] = useState<number | null>(currentScore ?? null);
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Close on backdrop tap
+  function handleBackdrop(e: React.MouseEvent) {
+    if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm pb-[env(safe-area-inset-bottom,0px)]"
+      onClick={handleBackdrop}
+    >
+      <div ref={ref} className="w-full max-w-md bg-[#0e1a2e] border border-white/[0.1] rounded-t-3xl px-5 pt-5 pb-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <div className="text-base font-bold">Hole {holeNumber} · {player.name}</div>
+            <div className="text-slate-500 text-xs mt-0.5">Par {par} — tap to change score</div>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 flex items-center justify-center rounded-full bg-white/[0.07] text-slate-400"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+        <div className="grid grid-cols-5 gap-2 mb-4">
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
+            <button
+              key={n}
+              onClick={() => setSelected(n)}
+              className={`flex flex-col items-center justify-center h-14 rounded-xl font-bold transition active:scale-90 ${
+                selected === n
+                  ? "bg-emerald-500/20 ring-1 ring-emerald-400 scale-[1.06]"
+                  : "bg-white/[0.05] hover:bg-white/[0.09]"
+              }`}
+            >
+              <span className={`w-8 h-8 inline-flex items-center justify-center text-sm font-bold text-white ${
+                selected !== n ? scoreRing(n, par) : ""
+              }`}>{n}</span>
+              {selected === n && (
+                <span className="text-[8px] font-semibold tracking-wide leading-none text-emerald-400/70 uppercase">
+                  {scoreLabel(n, par)}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={() => { if (selected !== null) { onSave(selected); onClose(); } }}
+          disabled={selected === null}
+          className={`w-full py-3.5 rounded-2xl font-bold text-sm transition ${
+            selected !== null
+              ? "bg-emerald-500 text-black hover:bg-emerald-400"
+              : "bg-white/[0.04] text-slate-600 cursor-not-allowed"
+          }`}
+        >
+          Save Score
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Scorecard tab ────────────────────────────────────────────────────────────
 
 function ScorecardView({ round }: { round: ActiveRound }) {
+  const { setHolePar, setHoleStrokeIndex, editHoleScore } = useMatchStore();
   const [seg, setSeg] = useState<"front" | "back">("front");
+  const [editCell, setEditCell] = useState<{ holeNumber: number; playerId: PlayerId } | null>(null);
+
+  // Auto-switch to the back 9 once we're past hole 9
+  useEffect(() => {
+    if (round.currentHole > 9) setSeg("back");
+  }, [round.currentHole]);
+
   const holes = round.courseHoles.filter((h) => (seg === "front" ? h.number <= 9 : h.number >= 10));
   const segPar = holes.reduce((s, h) => s + h.par, 0);
   const segLabel = seg === "front" ? "OUT" : "IN";
 
+  const editPlayer = editCell ? round.players.find((p) => p.id === editCell.playerId) : null;
+  const editHole = editCell ? round.courseHoles.find((h) => h.number === editCell.holeNumber) : null;
+  const editResult = editCell ? round.holeResults.find((r) => r.holeNumber === editCell.holeNumber) : null;
+
+  function cyclePar(holeNumber: number, currentPar: number) {
+    const next = currentPar === 3 ? 4 : currentPar === 4 ? 5 : 3;
+    setHolePar(holeNumber, next);
+  }
+
+  function cycleStrokeIndex(holeNumber: number, currentSI: number) {
+    const next = currentSI >= 18 ? 1 : currentSI + 1;
+    setHoleStrokeIndex(holeNumber, next);
+  }
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
+      {/* Segment toggle */}
       <div className="flex bg-white/[0.05] rounded-xl p-1 mx-4 mt-4 mb-3 shrink-0">
         {(["front", "back"] as const).map((s) => (
           <button
@@ -494,78 +600,104 @@ function ScorecardView({ round }: { round: ActiveRound }) {
         ))}
       </div>
 
-      <div className="flex-1 overflow-x-auto overflow-y-auto px-4 pb-[env(safe-area-inset-bottom,16px)]">
-        <div className="bg-[#0d0d0d] border border-white/[0.06] rounded-xl overflow-hidden" style={{ minWidth: 380 }}>
-          <div className="flex border-b border-white/[0.07]">
-            <div className="w-20 shrink-0 px-3 py-2.5 text-[9px] uppercase tracking-widest text-slate-700 font-semibold">HOLE</div>
+      <div className="mx-3 mb-1 shrink-0">
+        <p className="text-[10px] text-slate-700 text-center">Tap Par or HCP to edit · Tap a score to correct it</p>
+      </div>
+
+      <div className="flex-1 overflow-x-auto overflow-y-auto px-3 pb-[env(safe-area-inset-bottom,16px)]">
+        {/* Traditional scorecard grid */}
+        <div className="rounded-xl overflow-hidden border border-white/[0.08]" style={{ minWidth: 380 }}>
+
+          {/* HOLE row — dark green header */}
+          <div className="flex bg-emerald-950/80 border-b border-white/[0.06]">
+            <div className="w-[72px] shrink-0 px-2.5 py-2 text-[9px] uppercase tracking-widest text-emerald-700 font-bold">HOLE</div>
             {holes.map((h) => (
-              <div key={h.number} className="flex-1 text-center py-2.5 text-xs font-bold text-slate-400">
+              <div key={h.number} className={`flex-1 text-center py-2 text-xs font-black ${
+                h.number === round.currentHole ? "text-emerald-400" : "text-emerald-600/80"
+              }`}>
                 {h.number}
               </div>
             ))}
-            <div className="w-14 shrink-0 text-center py-2.5 text-xs font-bold text-slate-500">{segLabel}</div>
+            <div className="w-12 shrink-0 text-center py-2 text-[10px] font-bold text-emerald-700">{segLabel}</div>
           </div>
 
-          <div className="flex border-b border-white/[0.04]">
-            <div className="w-20 shrink-0 px-3 py-1.5 text-[9px] uppercase tracking-widest text-slate-800 font-semibold">YDS</div>
+          {/* HCP row — tappable to cycle */}
+          <div className="flex bg-white/[0.015] border-b border-white/[0.04]">
+            <div className="w-[72px] shrink-0 px-2.5 py-1.5 text-[9px] uppercase tracking-widest text-slate-700 font-semibold">HCP</div>
             {holes.map((h) => (
-              <div key={h.number} className="flex-1 text-center py-1.5 text-[9px] text-slate-800">—</div>
+              <button
+                key={h.number}
+                onClick={() => cycleStrokeIndex(h.number, h.strokeIndex)}
+                className="flex-1 text-center py-1.5 text-[10px] text-slate-600 hover:text-slate-400 transition"
+              >
+                {h.strokeIndex}
+              </button>
             ))}
-            <div className="w-14 shrink-0 text-center py-1.5 text-[9px] text-slate-800">—</div>
+            <div className="w-12 shrink-0" />
           </div>
 
-          <div className="flex border-b border-white/[0.04]">
-            <div className="w-20 shrink-0 px-3 py-1.5 text-[9px] uppercase tracking-widest text-slate-700 font-semibold">HCP</div>
+          {/* PAR row — tappable to cycle 3/4/5 */}
+          <div className="flex bg-emerald-950/30 border-b border-white/[0.08]">
+            <div className="w-[72px] shrink-0 px-2.5 py-2 text-[9px] uppercase tracking-widest text-slate-500 font-semibold">PAR</div>
             {holes.map((h) => (
-              <div key={h.number} className="flex-1 text-center py-1.5 text-[9px] text-slate-700">{h.strokeIndex}</div>
-            ))}
-            <div className="w-14 shrink-0" />
-          </div>
-
-          <div className="flex border-b border-white/[0.08]">
-            <div className="w-20 shrink-0 px-3 py-2 text-[9px] uppercase tracking-widest text-slate-500 font-semibold">PAR</div>
-            {holes.map((h) => (
-              <div key={h.number} className="flex-1 text-center py-2 text-xs font-bold text-slate-400">
+              <button
+                key={h.number}
+                onClick={() => cyclePar(h.number, h.par)}
+                className="flex-1 text-center py-2 text-xs font-bold text-slate-400 hover:text-emerald-400 transition"
+              >
                 {h.par}
-              </div>
+              </button>
             ))}
-            <div className="w-14 shrink-0 text-center py-2 text-xs font-bold text-slate-300">{segPar}</div>
+            <div className="w-12 shrink-0 text-center py-2 text-xs font-bold text-slate-300">{segPar}</div>
           </div>
 
+          {/* Player score rows */}
           {round.players.map((player, pi) => {
             const segResults = round.holeResults.filter((r) =>
               holes.some((h) => h.number === r.holeNumber)
             );
             const total = segResults.reduce((s, r) => s + (r.grossScores[player.id] ?? 0), 0);
-            // Only count par for holes that have actually been played — not all 9
             const parPlayed = segResults.reduce((s, r) => s + r.par, 0);
             const toPar = total > 0 ? total - parPlayed : null;
+
             return (
-              <div key={player.id} className={`flex ${pi < round.players.length - 1 ? "border-b border-white/[0.05]" : ""}`}>
-                <div className="w-20 shrink-0 px-3 py-3 text-xs font-semibold text-slate-200 truncate">
+              <div
+                key={player.id}
+                className={`flex ${pi < round.players.length - 1 ? "border-b border-white/[0.05]" : ""}`}
+              >
+                {/* Player name */}
+                <div className="w-[72px] shrink-0 px-2.5 py-3 text-[11px] font-bold text-slate-200 truncate leading-tight flex items-center">
                   {player.name}
                 </div>
+
+                {/* Score cells */}
                 {holes.map((h) => {
                   const result = round.holeResults.find((r) => r.holeNumber === h.number);
                   const score = result?.grossScores[player.id];
+                  const isEditable = score !== undefined;
                   return (
-                    <div key={h.number} className="flex-1 flex items-center justify-center py-2.5">
-                      {score !== undefined ? (
-                        <span className={`inline-flex items-center justify-center w-7 h-7 text-xs font-bold ${scoreStyle(score, h.par)}`}>
+                    <div key={h.number} className="flex-1 flex items-center justify-center py-2">
+                      {isEditable ? (
+                        <button
+                          onClick={() => setEditCell({ holeNumber: h.number, playerId: player.id })}
+                          className={`inline-flex items-center justify-center w-7 h-7 text-xs font-bold rounded transition active:scale-90 ${scoreStyle(score, h.par)}`}
+                        >
                           {score}
-                        </span>
+                        </button>
                       ) : (
-                        <span className="text-slate-800 text-sm">·</span>
+                        <span className="text-slate-800 text-sm leading-none">·</span>
                       )}
                     </div>
                   );
                 })}
-                <div className="w-14 shrink-0 flex flex-col items-center justify-center py-2.5 gap-0.5">
+
+                {/* Segment total */}
+                <div className="w-12 shrink-0 flex flex-col items-center justify-center py-2 gap-0.5">
                   {total > 0 ? (
                     <>
                       <span className="text-xs font-bold text-white">{total}</span>
                       {toPar !== null && (
-                        <span className={`text-[10px] font-semibold ${toPar < 0 ? "text-sky-400" : toPar === 0 ? "text-slate-600" : "text-orange-400"}`}>
+                        <span className={`text-[9px] font-semibold ${toPar < 0 ? "text-sky-400" : toPar === 0 ? "text-slate-600" : "text-orange-400"}`}>
                           {toPar === 0 ? "E" : toPar > 0 ? `+${toPar}` : toPar}
                         </span>
                       )}
@@ -578,7 +710,44 @@ function ScorecardView({ round }: { round: ActiveRound }) {
             );
           })}
         </div>
+
+        {/* Overall totals strip */}
+        {round.holeResults.length > 0 && (
+          <div className="mt-2 rounded-xl border border-white/[0.07] overflow-hidden">
+            <div className="flex bg-white/[0.03] border-b border-white/[0.06] px-3 py-1.5">
+              <span className="text-[9px] uppercase tracking-widest text-slate-600 font-semibold">Total thru {round.holeResults.length}</span>
+            </div>
+            {round.players.map((player) => {
+              const gross = round.holeResults.reduce((s, r) => s + (r.grossScores[player.id] ?? 0), 0);
+              const parTotal = round.holeResults.reduce((s, r) => s + r.par, 0);
+              const toPar = gross - parTotal;
+              return (
+                <div key={player.id} className="flex items-center justify-between px-3 py-2 border-b border-white/[0.04] last:border-0">
+                  <span className="text-xs font-semibold text-slate-300">{player.name}</span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-slate-500">{gross} strokes</span>
+                    <span className={`text-sm font-black tabular-nums ${toPar < 0 ? "text-sky-400" : toPar === 0 ? "text-white" : "text-orange-400"}`}>
+                      {toPar === 0 ? "E" : toPar > 0 ? `+${toPar}` : toPar}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
+
+      {/* Score edit modal */}
+      {editCell && editPlayer && editHole && (
+        <ScoreEditModal
+          holeNumber={editCell.holeNumber}
+          par={editHole.par}
+          player={editPlayer}
+          currentScore={editResult?.grossScores[editCell.playerId]}
+          onSave={(score) => editHoleScore(editCell.holeNumber, editCell.playerId, score)}
+          onClose={() => setEditCell(null)}
+        />
+      )}
     </div>
   );
 }
