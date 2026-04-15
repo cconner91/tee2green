@@ -104,7 +104,9 @@ function RoundComplete({ round, summary }: { round: ActiveRound; summary: RoundS
   const sorted = [...summary.playerSummaries].sort((a, b) =>
     round.game.scoringFormat === "PointsBased"
       ? (b.stablefordPoints ?? 0) - (a.stablefordPoints ?? 0)
-      : a.netToPar - b.netToPar
+      : round.enableHandicaps
+        ? a.netToPar - b.netToPar
+        : a.grossToPar - b.grossToPar
   );
 
   const winner = sorted[0];
@@ -117,9 +119,14 @@ function RoundComplete({ round, summary }: { round: ActiveRound; summary: RoundS
           <>
             <div className="text-3xl mb-3">⛳</div>
             <h1 className="text-xl font-bold">Round Complete</h1>
-            <p className={`font-bold text-xl ${toParColor(winner?.netToPar ?? 0)}`}>
-              {formatToPar(winner?.netToPar ?? 0)}
+            <p className={`font-bold text-xl ${toParColor(winner?.grossToPar ?? 0)}`}>
+              {formatToPar(winner?.grossToPar ?? 0)}
             </p>
+            {round.enableHandicaps && winner && (
+              <p className="text-sky-400 text-sm font-semibold mt-0.5">
+                {formatToPar(winner.netToPar)} net
+              </p>
+            )}
           </>
         ) : (
           <>
@@ -151,10 +158,18 @@ function RoundComplete({ round, summary }: { round: ActiveRound; summary: RoundS
                 <span className="font-bold text-emerald-400">{ps.stablefordPoints} pts</span>
               ) : (
                 <>
-                  <div className={`font-bold ${toParColor(ps.netToPar)}`}>
-                    {formatToPar(ps.netToPar)}
+                  <div className="flex items-baseline gap-2 justify-end">
+                    <span className="text-slate-500 text-xs">{ps.grossTotal}</span>
+                    <span className={`font-bold ${toParColor(ps.grossToPar)}`}>
+                      {formatToPar(ps.grossToPar)}
+                    </span>
                   </div>
-                  <div className="text-slate-600 text-xs">{ps.grossTotal} strokes</div>
+                  <div className="text-xs">
+                    {round.enableHandicaps
+                      ? <span className="text-sky-400/80">{formatToPar(ps.netToPar)} net</span>
+                      : <span className="text-slate-700">— net</span>
+                    }
+                  </div>
                 </>
               )}
             </div>
@@ -657,8 +672,10 @@ function ScorecardView({ round }: { round: ActiveRound }) {
               holes.some((h) => h.number === r.holeNumber)
             );
             const total = segResults.reduce((s, r) => s + (r.grossScores[player.id] ?? 0), 0);
+            const netTotal = segResults.reduce((s, r) => s + (r.netScores[player.id] ?? 0), 0);
             const parPlayed = segResults.reduce((s, r) => s + r.par, 0);
             const toPar = total > 0 ? total - parPlayed : null;
+            const netToPar = netTotal > 0 ? netTotal - parPlayed : null;
 
             return (
               <div
@@ -701,6 +718,11 @@ function ScorecardView({ round }: { round: ActiveRound }) {
                           {toPar === 0 ? "E" : toPar > 0 ? `+${toPar}` : toPar}
                         </span>
                       )}
+                      {round.enableHandicaps && netToPar !== null && (
+                        <span className={`text-[9px] font-semibold text-sky-400/70`}>
+                          {netToPar === 0 ? "E" : netToPar > 0 ? `+${netToPar}` : netToPar}n
+                        </span>
+                      )}
                     </>
                   ) : (
                     <span className="text-slate-800 text-sm">—</span>
@@ -714,21 +736,46 @@ function ScorecardView({ round }: { round: ActiveRound }) {
         {/* Overall totals strip */}
         {round.holeResults.length > 0 && (
           <div className="mt-2 rounded-xl border border-white/[0.07] overflow-hidden">
-            <div className="flex bg-white/[0.03] border-b border-white/[0.06] px-3 py-1.5">
-              <span className="text-[9px] uppercase tracking-widest text-slate-600 font-semibold">Total thru {round.holeResults.length}</span>
+            {/* Header row */}
+            <div className="flex items-center justify-between bg-white/[0.03] border-b border-white/[0.06] px-3 py-1.5">
+              <span className="text-[9px] uppercase tracking-widest text-slate-600 font-semibold">
+                Total thru {round.holeResults.length}
+              </span>
+              <div className="flex items-center gap-4">
+                <span className="text-[9px] uppercase tracking-widest text-slate-700 w-10 text-center">Gross</span>
+                <span className="text-[9px] uppercase tracking-widest text-slate-700 w-10 text-center">Net</span>
+              </div>
             </div>
             {round.players.map((player) => {
               const gross = round.holeResults.reduce((s, r) => s + (r.grossScores[player.id] ?? 0), 0);
-              const parTotal = round.holeResults.reduce((s, r) => s + r.par, 0);
-              const toPar = gross - parTotal;
+              const net   = round.holeResults.reduce((s, r) => s + (r.netScores[player.id] ?? 0), 0);
+              const par   = round.holeResults.reduce((s, r) => s + r.par, 0);
+              const grossToPar = gross - par;
+              const netToPar   = net - par;
               return (
-                <div key={player.id} className="flex items-center justify-between px-3 py-2 border-b border-white/[0.04] last:border-0">
+                <div key={player.id} className="flex items-center justify-between px-3 py-2.5 border-b border-white/[0.04] last:border-0">
                   <span className="text-xs font-semibold text-slate-300">{player.name}</span>
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs text-slate-500">{gross} strokes</span>
-                    <span className={`text-sm font-black tabular-nums ${toPar < 0 ? "text-sky-400" : toPar === 0 ? "text-white" : "text-orange-400"}`}>
-                      {toPar === 0 ? "E" : toPar > 0 ? `+${toPar}` : toPar}
-                    </span>
+                  <div className="flex items-center gap-4">
+                    {/* Gross */}
+                    <div className="w-10 text-center">
+                      <span className={`text-sm font-black tabular-nums ${grossToPar < 0 ? "text-sky-400" : grossToPar === 0 ? "text-white" : "text-orange-400"}`}>
+                        {grossToPar === 0 ? "E" : grossToPar > 0 ? `+${grossToPar}` : grossToPar}
+                      </span>
+                      <div className="text-[9px] text-slate-600">{gross}</div>
+                    </div>
+                    {/* Net */}
+                    <div className="w-10 text-center">
+                      {round.enableHandicaps ? (
+                        <>
+                          <span className={`text-sm font-black tabular-nums ${netToPar < 0 ? "text-sky-400" : netToPar === 0 ? "text-white" : "text-orange-400"}`}>
+                            {netToPar === 0 ? "E" : netToPar > 0 ? `+${netToPar}` : netToPar}
+                          </span>
+                          <div className="text-[9px] text-slate-600">{net}</div>
+                        </>
+                      ) : (
+                        <span className="text-sm font-bold text-slate-700">—</span>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
@@ -1061,11 +1108,19 @@ function HoleView({
                 </div>
                 <div className="text-right">
                   {ps && ps.holesPlayed > 0 ? (
-                    <span className={`text-2xl font-black tabular-nums ${toParColor(ps.netToPar)}`}>
-                      {ps.stablefordPoints !== undefined
-                        ? `${ps.stablefordPoints}pts`
-                        : formatToPar(ps.netToPar)}
-                    </span>
+                    <>
+                      <span className={`text-2xl font-black tabular-nums ${toParColor(ps.grossToPar)}`}>
+                        {ps.stablefordPoints !== undefined
+                          ? `${ps.stablefordPoints}pts`
+                          : formatToPar(ps.grossToPar)}
+                      </span>
+                      <div className="text-[11px] font-semibold tabular-nums mt-0.5">
+                        {round.enableHandicaps
+                          ? <span className="text-sky-400/80">{formatToPar(ps.netToPar)} net</span>
+                          : <span className="text-slate-700">— net</span>
+                        }
+                      </div>
+                    </>
                   ) : (
                     <span className="text-slate-700 text-2xl font-black">—</span>
                   )}
