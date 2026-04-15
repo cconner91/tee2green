@@ -827,16 +827,28 @@ function MatchSummaryModal({
     : `$${betting.amount} full match`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-md bg-[#0c1628] border-t border-white/[0.08] rounded-t-3xl px-5 pt-5 pb-[env(safe-area-inset-bottom,20px)] overflow-y-auto max-h-[92vh]">
-
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-sm"
+      onClick={onEdit}
+    >
+      <div
+        className="w-full max-w-md bg-[#0c1628] border-t border-white/[0.08] rounded-t-3xl px-5 pt-5 pb-[env(safe-area-inset-bottom,20px)] overflow-y-auto max-h-[92vh]"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Handle */}
         <div className="w-10 h-1 bg-white/10 rounded-full mx-auto mb-5" />
 
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-lg font-bold">Match Summary</h2>
-          <button onClick={onEdit} className="text-slate-500 text-sm hover:text-white transition">
-            ← Edit
+          <button
+            onClick={onEdit}
+            className="w-8 h-8 flex items-center justify-center rounded-full bg-white/[0.06] text-slate-400 hover:text-white hover:bg-white/[0.1] transition"
+            aria-label="Close"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
           </button>
         </div>
         <p className="text-slate-600 text-xs mb-1">Review your setup before starting.</p>
@@ -1010,8 +1022,8 @@ export default function SetupPage() {
         </div>
       </div>
 
-      {/* Content */}
-      <div className="px-4 py-6">
+      {/* Content — extra bottom padding on steps with fixed Continue button */}
+      <div className={`px-4 py-6 ${[2, 3, 5].includes(setup.step) ? "pb-36" : ""}`}>
         {setup.step === 1 && <StepGroupSize />}
         {setup.step === 2 && <StepPlayers />}
         {setup.step === 3 && <StepCourse />}
@@ -1019,26 +1031,29 @@ export default function SetupPage() {
         {setup.step === 5 && <StepBetting />}
       </div>
 
-      {/* Footer — sticky above the bottom tab bar */}
-      {/* Only shown on steps that need a manual Continue (steps 2, 3, 5) */}
+      {/* Fixed Continue button — floats above the tab bar, never overlaps content */}
       {(setup.step === 2 || setup.step === 3 || setup.step === 5) && (
-        <div className="sticky bottom-24 z-20 px-4 pt-3 pb-3 bg-gradient-to-t from-[#060d1a] via-[#060d1a] to-[#060d1a]/0">
-          <button
-            onClick={handleNext}
-            disabled={!canAdvance}
-            className={`w-full py-4 rounded-2xl font-bold text-sm transition active:scale-[0.98] ${
-              canAdvance
-                ? "bg-emerald-500 text-black hover:bg-emerald-400 shadow-[0_4px_24px_rgba(16,185,129,0.3)]"
-                : "bg-white/[0.04] text-slate-600 cursor-not-allowed border border-white/[0.07]"
-            }`}
-          >
-            {setup.step === 5 ? "Review & Start →" : "Continue →"}
-          </button>
-          {setup.step === 2 && !allNamed && (
-            <p className="text-center text-slate-600 text-xs mt-2">
-              Enter all player names to continue
-            </p>
-          )}
+        <div className="fixed bottom-24 inset-x-0 z-20 flex justify-center px-4 pointer-events-none">
+          <div className="w-full max-w-md pointer-events-auto">
+            <div className="bg-gradient-to-t from-[#060d1a] via-[#060d1a]/90 to-transparent pt-6 pb-3 px-0">
+              <button
+                onClick={handleNext}
+                disabled={!canAdvance}
+                className={`w-full py-4 rounded-2xl font-bold text-sm transition active:scale-[0.98] ${
+                  canAdvance
+                    ? "bg-emerald-500 text-black hover:bg-emerald-400 shadow-[0_4px_24px_rgba(16,185,129,0.3)]"
+                    : "bg-white/[0.04] text-slate-600 cursor-not-allowed border border-white/[0.07]"
+                }`}
+              >
+                {setup.step === 5 ? "Review & Start →" : "Continue →"}
+              </button>
+              {setup.step === 2 && !allNamed && (
+                <p className="text-center text-slate-600 text-xs mt-2">
+                  Enter all player names to continue
+                </p>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>
