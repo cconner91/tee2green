@@ -61,13 +61,16 @@ export interface BettingConfig {
 }
 
 /**
- * @deprecated kept for the Skins game definition and Nassau game backward-compat.
- * New code should use BettingStructure + BettingConfig instead.
+ * Discriminator on GolfGameDefinition that controls how a game's
+ * betting is structured at the engine level.
+ * - Standard: normal stake settled at end (FullMatch / HoleByHole / Nassau chosen by user)
+ * - Nassau: game forces Nassau structure (Front/Back/Overall)
+ * - Skins: per-hole pool with carryovers; skin value set by user
  */
 export enum BettingMode {
-  Standard = "Standard", // single settlement at end
-  Nassau   = "Nassau",   // kept for Nassau game definition
-  Skins    = "Skins",    // Skins game: per-hole pool with carryovers
+  Standard = "Standard",
+  Nassau   = "Nassau",
+  Skins    = "Skins",
 }
 
 export interface GameConfiguration {
